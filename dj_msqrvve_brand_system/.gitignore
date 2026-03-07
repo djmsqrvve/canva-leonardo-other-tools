@@ -1,0 +1,13 @@
+# Environments
+venv/
+.env
+__pycache__/
+*.pyc
+
+# Local session data
+user_profile/
+
+# Build outputs
+dist/
+build/
+*.egg-info/

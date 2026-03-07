@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+}
+
+@theme {
+  --color-shadowpunk-purple: #4b0082;
+  --color-shadowpunk-teal: #00ffff;
+  --color-shadowpunk-amber: #ffbf00;
+  --color-shadowpunk-moss: #556b2f;
+  
+  --shadow-glow: 0 0 10px #00ffff, 0 0 20px #4b0082;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 10px #00ffff; }
+  50% { opacity: 1; box-shadow: 0 0 25px #00ffff; }
+}
+
+.glow-box {
+  animation: pulse-glow 3s infinite;
+}

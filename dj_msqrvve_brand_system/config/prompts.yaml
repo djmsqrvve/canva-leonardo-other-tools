@@ -1,0 +1,74 @@
+# DJ MSQRVVE Brand System Configuration
+# Aesthetic: Twilight Shadowpunk
+# Style Notes: Blade Runner meets bioluminescent nature / Sleepywood mystique
+# Colors: Deep twilight purples, electric teals, warm amber neon, organic mossy greens, dark noir blacks
+
+models:
+  phoenix: "6b645e3a-d64f-4341-a6d8-7aa363f858d3" # Replace with actual Leonardo Phoenix Model ID
+  kino: "98ab0a43-05b6-43b9-ab28-31ea67885b5d"   # Replace with actual Leonardo Kino Model ID
+  pixel_art: "e5a291b6-3990-495a-b1fa-7bcc18cefb85" # Replace with actual Pixel Art Model ID
+
+prompts:
+  # --- SOCIAL MEDIA ---
+  social_banner_bg:
+    description: "Background for Twitch/YouTube/Twitter banners."
+    model: "phoenix"
+    prompt: "Twilight shadowpunk cityscape, inverted googie organic forms, deep twilight purples and electric teals, bioluminescent tech glowing in the dark noir blacks, neon-deco style, cinematic lighting, 8k resolution, highly detailed, empty space in the center for text."
+    negative_prompt: "text, watermark, ugly, low resolution, crowded, messy"
+    alchemy: true
+    width: 1920
+    height: 1080
+
+  profile_avatar:
+    description: "Character portrait for social profiles."
+    model: "phoenix"
+    prompt: "Cyberpunk character portrait, masquerave-noir theme, wearing a sleek bioluminescent mask, warm amber neon highlights, sleepywood mystique, polished and confident, masterpiece, vivid colors, dark background."
+    negative_prompt: "ugly, malformed, extra limbs, bad anatomy, text, watermark"
+    alchemy: true
+    width: 1024
+    height: 1024
+
+  # --- STREAM ALERTS ---
+  raid_alert_art:
+    description: "Dynamic art for a raid alert."
+    model: "phoenix"
+    prompt: "A glowing neon sign displaying bioluminescent tech, masquerave-noir style, deep twilight purples and warm amber neon, cyberpunk wright architecture background, celebration mood, high quality."
+    alchemy: true
+    width: 1024
+    height: 512
+
+  follower_icon:
+    description: "Small icon for new followers."
+    model: "phoenix"
+    prompt: "A small glowing orb, organic mossy greens and electric teals, sleepywood mystique, subtle orbit glow, isolated on black background, 3d render, high quality."
+    alchemy: true
+    width: 512
+    height: 512
+
+  # --- GAME ASSETS (HELIX 2000 - 2D) ---
+  helix2000_tileset_grass:
+    description: "Isometric grass/stone tileset for 2D game."
+    model: "pixel_art"
+    prompt: "2D game isometric tileset, sleepywood mystique, bioluminescent organic mossy greens, dark noir stone paths, pixel art hybrid, highly detailed, seamless texture."
+    width: 1024
+    height: 1024
+
+  # --- GAME ASSETS (HELIX MAIN - 3D) ---
+  helix_main_texture_metal:
+    description: "Seamless metal texture for 3D game."
+    model: "kino"
+    prompt: "Seamless texture, usonian-luxe architecture panel, glowing electric teal lines, deep twilight purple base metal, PBR material base, high resolution, photorealistic."
+    width: 1024
+    height: 1024
+
+  bevy_skybox:
+    description: "Equirectangular skybox for 3D engine."
+    model: "phoenix"
+    prompt: "360 degree equirectangular panorama skybox, deep twilight purples, massive inverted googie organic forms in the distance, neon-deco cityscape, glowing orbit rings in the sky, 8k resolution, highly detailed sky."
+    width: 2048
+    height: 1024
+
+canva_templates:
+  twitch_starting_soon: "TEMPLATE_ID_HERE"
+  youtube_thumbnail: "TEMPLATE_ID_HERE"
+  twitter_post: "TEMPLATE_ID_HERE"
