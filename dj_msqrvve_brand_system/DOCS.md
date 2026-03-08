@@ -4,10 +4,11 @@ This document outlines the reusable tools and helper scripts developed for the *
 
 ## 🛠 Project Structure
 
-- `src/lib/`: Reusable core libraries.
-  - `canva_api.py`: Official Canva Connect API wrapper (authenticated via `.env`).
-  - `leonardo_api.py`: Official Leonardo.Ai Production API wrapper (authenticated via `.env`).
-  - `leonardo_browser.py`: Browser-based automation for Leonardo.ai (uses Selenium + Chrome Profile).
+- `src/apis/`: Reusable API clients.
+  - `canva_api.py`: Canva facade client.
+  - `canva/`: Canva module clients (assets, designs, autofill, exports).
+  - `leonardo_api.py`: Leonardo.Ai Production API wrapper (authenticated via `.env`).
+- `src/lib/leonardo_browser.py`: Browser-based automation for Leonardo.ai (uses Selenium + Chrome Profile).
 - `src/main.py`: The central CLI entry point for the brand system.
 - `src/auth_server.py`: Local OAuth server to handle Canva authentication and token generation.
 - `user_profile/`: Persistent Chrome profile directory used by browser automation to maintain logins (e.g., Canva SSO).
@@ -32,11 +33,12 @@ python src/main.py generate-browser "your prompt"
 ### 3. API-Based Generation (Production Route)
 If you have a `LEONARDO_API_KEY` and credits:
 ```bash
-python src/main.py generate-api --asset "social_banner"
+python src/main.py generate-api social_banner_bg
 ```
 
 ## 🧪 Testing
 Run the unit tests to ensure the libraries are healthy:
 ```bash
-pytest tests/
+cd ..
+make test
 ```

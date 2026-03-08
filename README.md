@@ -16,7 +16,8 @@ This project bridges the creative power of **Leonardo.Ai** with the layout preci
 ### 1. Brand System CLI (`dj_msqrvve_brand_system/`)
 The core Python engine for asset generation.
 - **`src/main.py`**: Unified entry point for all generation tasks.
-- **`src/lib/`**: Reusable modules for Leonardo API, Leonardo Browser (automation), and Canva API.
+- **`src/apis/`**: Canva and Leonardo API clients.
+- **`src/lib/leonardo_browser.py`**: Browser automation flow for Leonardo web generation.
 - **`config/prompts.yaml`**: The master "Shadowpunk" prompt library.
 
 ### 2. Dashboard (`dashboard/`)
@@ -70,7 +71,12 @@ A Next.js 16 control center running on **port 6767**.
 ## 🧪 Testing
 Run the comprehensive test suite to ensure pipeline health:
 ```bash
-pytest dj_msqrvve_brand_system/tests/
+make test
+```
+
+Quick local environment validation:
+```bash
+make health
 ```
 
 ---
@@ -82,3 +88,4 @@ For deeper technical details, see:
 - `docs/CANVA_SETUP_GUIDE.md`: Integration setup steps.
 - `docs/CANVA_LEONARDO_UPGRADE_MASTER_PLAN.md`: Full-stack upgrade roadmap (phased).
 - `docs/CANVA_LEONARDO_UPGRADE_AGENT_HANDOFF.md`: New-agent execution and handoff guide.
+- `CONTRIBUTING.md`: Commit standards and validation workflow.

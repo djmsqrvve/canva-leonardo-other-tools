@@ -26,8 +26,8 @@ npm run dev
 ```
 3. Validate tests:
 ```bash
-cd /home/dj/dev/canva_leonardo_other_tools/dj_msqrvve_brand_system
-pytest tests/
+cd /home/dj/dev/canva_leonardo_other_tools
+make test
 ```
 
 ## Immediate Implementation Order (P0)
