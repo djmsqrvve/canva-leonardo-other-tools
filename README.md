@@ -80,3 +80,5 @@ For deeper technical details, see:
 - `docs/DJ_MSQRVVE_RESEARCH_REPORT.md`: Full research and architecture.
 - `dj_msqrvve_brand_system/DOCS.md`: CLI and library usage.
 - `docs/CANVA_SETUP_GUIDE.md`: Integration setup steps.
+- `docs/CANVA_LEONARDO_UPGRADE_MASTER_PLAN.md`: Full-stack upgrade roadmap (phased).
+- `docs/CANVA_LEONARDO_UPGRADE_AGENT_HANDOFF.md`: New-agent execution and handoff guide.
