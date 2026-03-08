@@ -45,6 +45,61 @@ prompts:
     width: 512
     height: 512
 
+  # --- MSQRVVE MADNESS (MARCH SUBATHON 2026) ---
+  madness_launch_key_art:
+    description: "Primary launch hero art for MSQRVVE MADNESS."
+    model: "phoenix"
+    prompt: "MSQRVVE MADNESS subathon launch key art, high energy neon-deco x masquerave-noir visual style, bioluminescent streaks, futuristic stage atmosphere, dramatic cinematic lighting, composition with clear center safe zone for title text, no typography embedded."
+    negative_prompt: "text, watermark, blurry, low quality, deformed, busy unreadable composition"
+    alchemy: true
+    width: 1920
+    height: 1080
+
+  madness_countdown_story:
+    description: "Vertical countdown story panel for social promos."
+    model: "phoenix"
+    prompt: "Vertical social story art for MSQRVVE MADNESS countdown, cyberpunk event poster energy, neon cyan magenta gold accents, glowing timer motif, dynamic upward motion lines, clean central safe area for countdown text, no typography embedded."
+    negative_prompt: "text, watermark, cluttered composition, low detail"
+    alchemy: true
+    width: 1080
+    height: 1920
+
+  madness_schedule_card:
+    description: "Social schedule card background."
+    model: "phoenix"
+    prompt: "High contrast schedule card background for a livestream subathon, twilight shadowpunk architecture, geometric frame zones for schedule blocks, subtle decorative glow, premium editorial style, no typography embedded."
+    negative_prompt: "text, watermark, low resolution, muddy colors"
+    alchemy: true
+    width: 1080
+    height: 1350
+
+  madness_sub_goal_meter_bg:
+    description: "OBS HUD background plate for sub goal and timer."
+    model: "phoenix"
+    prompt: "Transparent-friendly styled HUD plate concept for live stream overlay, neon-deco plus googie-atomic accents, progress bar lanes, timer zone, elegant high tech frame, dark noir backdrop with luminous accents, no typography."
+    negative_prompt: "text, watermark, photoreal people, noisy details"
+    alchemy: true
+    width: 1920
+    height: 1080
+
+  madness_discord_banner:
+    description: "Discord announcement banner for event launch."
+    model: "phoenix"
+    prompt: "Discord announcement banner visual for MSQRVVE MADNESS, party energy, cyberpunk stage lights, vivid teal magenta brass palette, celebratory but clean composition with right-side safe area for copy, no embedded text."
+    negative_prompt: "text, watermark, washed out, low quality"
+    alchemy: true
+    width: 1920
+    height: 1080
+
+  madness_game_vote_panel:
+    description: "Community vote panel visual."
+    model: "phoenix"
+    prompt: "Community vote panel artwork for livestream game selection, modular card zones for 4 game choices, bioluminescent borders, modern esports broadcast design language, high contrast readability layout, no typography."
+    negative_prompt: "text, watermark, low detail, messy composition"
+    alchemy: true
+    width: 1600
+    height: 900
+
   # --- GAME ASSETS (HELIX 2000 - 2D) ---
   helix2000_tileset_grass:
     description: "Isometric grass/stone tileset for 2D game."
@@ -72,3 +127,9 @@ canva_templates:
   twitch_starting_soon: "TEMPLATE_ID_HERE"
   youtube_thumbnail: "TEMPLATE_ID_HERE"
   twitter_post: "TEMPLATE_ID_HERE"
+  madness_launch_key_art: "TEMPLATE_ID_HERE"
+  madness_countdown_story: "TEMPLATE_ID_HERE"
+  madness_schedule_card: "TEMPLATE_ID_HERE"
+  madness_sub_goal_meter_bg: "TEMPLATE_ID_HERE"
+  madness_discord_banner: "TEMPLATE_ID_HERE"
+  madness_game_vote_panel: "TEMPLATE_ID_HERE"
