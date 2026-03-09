@@ -1,31 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import path from 'path';
-import { promisify } from 'util';
+import { buildGenerationCommand } from '@/lib/generation-command';
 
-const execPromise = promisify(exec);
+function runProcess(command: string, args: string[], env: NodeJS.ProcessEnv) {
+  return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
+    const child = spawn(command, args, { env });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => {
+      reject(error);
+    });
+
+    child.on('close', (code) => {
+      resolve({ stdout, stderr, exitCode: code ?? 1 });
+    });
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
     const { assetType, prompt, useBrowser } = await req.json();
-
-    const rootDir = path.resolve(process.cwd(), '..');
-    const venvPath = path.join(rootDir, 'dj_msqrvve_brand_system', 'venv', 'bin', 'activate');
-    const scriptPath = path.join(rootDir, 'dj_msqrvve_brand_system', 'src', 'main.py');
-
-    let command = '';
-    if (useBrowser) {
-        // Run with browser (headless for the dashboard)
-        command = `source ${venvPath} && export PYTHONPATH=$PYTHONPATH:${path.join(rootDir, 'dj_msqrvve_brand_system', 'src')} && python3 ${scriptPath} generate-browser "${prompt}" --headless`;
-    } else {
-        // Run with API
-        command = `source ${venvPath} && export PYTHONPATH=$PYTHONPATH:${path.join(rootDir, 'dj_msqrvve_brand_system', 'src')} && python3 ${scriptPath} generate-api ${assetType}`;
+    if (useBrowser && !prompt) {
+      return NextResponse.json({ error: 'Prompt is required for browser generation.' }, { status: 400 });
+    }
+    if (!useBrowser && !assetType) {
+      return NextResponse.json({ error: 'assetType is required for API generation.' }, { status: 400 });
     }
 
-    const { stdout, stderr } = await execPromise(command, { shell: '/bin/bash' });
+    const rootDir = path.resolve(process.cwd(), '..');
+    const command = buildGenerationCommand({
+      rootDir,
+      assetType,
+      prompt,
+      useBrowser: Boolean(useBrowser),
+    });
 
-    if (stderr && !stdout) {
-      return NextResponse.json({ error: stderr }, { status: 500 });
+    const { stdout, stderr, exitCode } = await runProcess(
+      command.pythonPath,
+      command.args,
+      command.env,
+    );
+
+    if (exitCode !== 0) {
+      return NextResponse.json({ error: stderr || stdout || 'Generation failed.' }, { status: 500 });
     }
 
     // Parse the output for image URLs

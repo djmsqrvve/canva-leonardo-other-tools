@@ -20,10 +20,10 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const ASSET_TYPES = [
-  { id: 'social_banner', label: 'Social Banner', icon: Layout },
+  { id: 'social_banner_bg', label: 'Social Banner', icon: Layout },
   { id: 'profile_avatar', label: 'Profile Avatar', icon: Palette },
-  { id: 'raid_alert', label: 'Raid Alert', icon: Zap },
-  { id: 'helix_tileset', label: 'Helix 2000 Tileset', icon: Layers },
+  { id: 'raid_alert_art', label: 'Raid Alert', icon: Zap },
+  { id: 'helix2000_tileset_grass', label: 'Helix 2000 Tileset', icon: Layers },
   { id: 'bevy_skybox', label: 'Bevy Skybox', icon: Sparkles },
 ];
 
@@ -34,13 +34,14 @@ export default function DashboardPage() {
   const [useBrowser, setUseBrowser] = useState(true);
 
   const handleGenerate = async () => {
-    if (!prompt) return;
+    if (useBrowser && !prompt) return;
 
     const id = Math.random().toString(36).substr(2, 9);
+    const effectivePrompt = prompt || `preset:${selectedAsset}`;
     const newGen = {
       id,
       type: selectedAsset,
-      prompt,
+      prompt: effectivePrompt,
       urls: [],
       status: 'pending' as const,
       timestamp: Date.now()
@@ -153,7 +154,7 @@ export default function DashboardPage() {
                 disabled={isGenerating || !prompt}
                 className={cn(
                   "w-full py-4 rounded font-bold uppercase tracking-widest flex items-center justify-center gap-3 transition-all duration-300",
-                  isGenerating || !prompt
+                  isGenerating || (useBrowser && !prompt)
                     ? "bg-white/5 text-white/20 cursor-not-allowed"
                     : "bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_20px_rgba(6,182,212,0.4)]"
                 )}
