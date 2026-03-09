@@ -21,7 +21,8 @@ pip install -r requirements-browser.txt
 2. Create a focused branch.
 3. Make one coherent change at a time.
 4. Run the supported validation commands.
-5. Open a PR with clear scope, risk, and rollback notes.
+5. Commit each validated change slice before moving to the next task or gap.
+6. Open a PR with clear scope, risk, and rollback notes.
 
 ## Validation
 Required for all code changes:
@@ -48,6 +49,7 @@ Examples:
 
 ## Expectations
 - Keep comments targeted and explain only non-obvious logic.
+- Do not leave validated work uncommitted while continuing into the next development slice.
 - Update docs when behavior or setup changes.
 - Do not add new behavior to deprecated or archived surfaces.
 - Keep public-facing examples aligned with real supported workflows.
