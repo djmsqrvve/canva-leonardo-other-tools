@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import time
@@ -28,9 +29,14 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised via preflight
     ChromeDriverManager = None
 
 
-LOGIN_BUTTON_XPATH = "//button[contains(., 'Generate')]"
+GENERATE_BUTTON_XPATH = "//button[contains(., 'Generate')]"
 PROMPT_TEXTAREA_SELECTOR = "textarea[placeholder*='Type a prompt']"
 GALLERY_IMAGE_SELECTOR = "img.generation-image"
+LEONARDO_LOGIN_URL = "https://app.leonardo.ai/auth/login"
+LEONARDO_IMAGE_GENERATION_URL = "https://app.leonardo.ai/image-generation"
+AUTH_PAGE_MARKERS = ("continue with google", "sign in", "log in", "login")
+GENERATION_TIMEOUT_SECONDS = 180
+GENERATION_POLL_INTERVAL_SECONDS = 2.0
 CHROME_CANDIDATES = (
     "google-chrome",
     "google-chrome-stable",
@@ -50,7 +56,9 @@ class LeonardoBrowser:
     def __init__(self, headless: bool = False, login_timeout_seconds: int = 300):
         self.headless = headless
         self.login_timeout_seconds = login_timeout_seconds
-        self.profile_path = Path(__file__).resolve().parent.parent.parent / "user_profile"
+        project_root = Path(__file__).resolve().parent.parent.parent
+        self.profile_path = project_root / "user_profile"
+        self.artifact_root = project_root / "outputs" / "browser-artifacts"
 
         self._ensure_optional_dependencies()
         self.chrome_binary = self._resolve_chrome_binary()
@@ -116,13 +124,110 @@ class LeonardoBrowser:
     def _wait_for_dashboard_ready(self, timeout_seconds: int = 30) -> None:
         local_wait = WebDriverWait(self.driver, timeout_seconds)
         local_wait.until(
-            EC.presence_of_element_located((By.XPATH, LOGIN_BUTTON_XPATH))
+            EC.presence_of_element_located((By.XPATH, GENERATE_BUTTON_XPATH))
+        )
+
+    def _is_auth_page(self) -> bool:
+        current_url = (getattr(self.driver, "current_url", "") or "").lower()
+        if "/auth/" in current_url:
+            return True
+
+        page_source = (getattr(self.driver, "page_source", "") or "").lower()
+        return any(marker in page_source for marker in AUTH_PAGE_MARKERS)
+
+    def _capture_failure_artifacts(self, phase: str, reason: str) -> dict[str, str]:
+        artifact_dir = self.artifact_root / f"{int(time.time() * 1000)}-{phase}"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+
+        artifacts: dict[str, str] = {}
+        screenshot_path = artifact_dir / "screenshot.png"
+        try:
+            if self.driver.save_screenshot(str(screenshot_path)):
+                artifacts["screenshot"] = str(screenshot_path)
+        except Exception:  # noqa: BLE001
+            pass
+
+        page_source = getattr(self.driver, "page_source", None)
+        if isinstance(page_source, str):
+            page_source_path = artifact_dir / "page.html"
+            page_source_path.write_text(page_source, encoding="utf-8")
+            artifacts["page_source"] = str(page_source_path)
+
+        metadata = {
+            "phase": phase,
+            "reason": reason,
+            "headless": self.headless,
+            "current_url": getattr(self.driver, "current_url", ""),
+        }
+        metadata_path = artifact_dir / "metadata.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        artifacts["metadata"] = str(metadata_path)
+        return artifacts
+
+    def _format_artifact_hint(self, artifacts: dict[str, str]) -> str:
+        if not artifacts:
+            return ""
+        parts = [f"{key}={value}" for key, value in sorted(artifacts.items())]
+        return f"Artifacts: {', '.join(parts)}."
+
+    def _raise_session_refresh_required(self, phase: str, reason: str) -> None:
+        artifacts = self._capture_failure_artifacts(phase, reason)
+        artifact_hint = self._format_artifact_hint(artifacts)
+        raise BrowserPreflightError(
+            "Saved Leonardo session appears to be expired or login is required. "
+            f"Re-run {_bootstrap_command()} without --headless to refresh the profile. "
+            f"{artifact_hint}"
+        )
+
+    def _collect_generation_image_urls(self, limit: int = 8) -> list[str]:
+        urls: list[str] = []
+        seen: set[str] = set()
+        for image in self.driver.find_elements(By.CSS_SELECTOR, GALLERY_IMAGE_SELECTOR):
+            src = (image.get_attribute("src") or "").strip()
+            if not src or src.startswith("data:") or src in seen:
+                continue
+            seen.add(src)
+            urls.append(src)
+            if len(urls) >= limit:
+                break
+        return urls
+
+    def _wait_for_generation_results(
+        self,
+        existing_urls: set[str],
+        *,
+        timeout_seconds: int = GENERATION_TIMEOUT_SECONDS,
+        poll_interval_seconds: float = GENERATION_POLL_INTERVAL_SECONDS,
+    ) -> list[str]:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            if self._is_auth_page():
+                self._raise_session_refresh_required(
+                    "generation-session-expired",
+                    "Leonardo redirected back to authentication while waiting for generation results.",
+                )
+
+            current_urls = self._collect_generation_image_urls()
+            new_urls = [url for url in current_urls if url not in existing_urls]
+            if new_urls:
+                return new_urls[:4]
+
+            time.sleep(poll_interval_seconds)
+
+        artifacts = self._capture_failure_artifacts(
+            "generation-timeout",
+            f"No new Leonardo images were detected within {timeout_seconds} seconds.",
+        )
+        artifact_hint = self._format_artifact_hint(artifacts)
+        raise RuntimeError(
+            f"Leonardo browser generation did not produce new images within {timeout_seconds} seconds. "
+            f"{artifact_hint}"
         )
 
     def login(self):
         """Open Leonardo and ensure the current profile is authenticated."""
         print("Navigating to Leonardo login...")
-        self.driver.get("https://app.leonardo.ai/auth/login")
+        self.driver.get(LEONARDO_LOGIN_URL)
 
         try:
             self._wait_for_dashboard_ready()
@@ -130,10 +235,13 @@ class LeonardoBrowser:
             return
         except Exception as exc:  # noqa: BLE001
             if self.headless:
-                raise BrowserPreflightError(
-                    "Headless browser generation requires a valid saved Leonardo session. "
-                    f"Re-run {_bootstrap_command()} without --headless to log in interactively."
-                ) from exc
+                try:
+                    self._raise_session_refresh_required(
+                        "login-headless-session",
+                        "Headless login check could not detect a valid saved Leonardo session.",
+                    )
+                except BrowserPreflightError as refresh_error:
+                    raise refresh_error from exc
 
         print("Interactive login required. Complete the sign-in flow in the browser window.")
         deadline = time.time() + self.login_timeout_seconds
@@ -145,8 +253,14 @@ class LeonardoBrowser:
             except Exception:  # noqa: BLE001
                 time.sleep(2)
 
+        artifacts = self._capture_failure_artifacts(
+            "login-timeout",
+            f"Interactive login was not completed within {self.login_timeout_seconds} seconds.",
+        )
+        artifact_hint = self._format_artifact_hint(artifacts)
         raise BrowserPreflightError(
-            f"Interactive login was not completed within {self.login_timeout_seconds} seconds."
+            f"Interactive login was not completed within {self.login_timeout_seconds} seconds. "
+            f"{artifact_hint}"
         )
 
     def generate(self, prompt: str, model_id=None):
@@ -157,9 +271,16 @@ class LeonardoBrowser:
         """
         del model_id  # Browser mode currently drives the default web UI only.
         print(f"Triggering generation for prompt: '{prompt[:50]}...'")
-        self.driver.get("https://app.leonardo.ai/image-generation")
+        self.driver.get(LEONARDO_IMAGE_GENERATION_URL)
+
+        if self._is_auth_page():
+            self._raise_session_refresh_required(
+                "generation-auth-required",
+                "Leonardo redirected to login before the generation page loaded.",
+            )
 
         try:
+            existing_urls = set(self._collect_generation_image_urls())
             prompt_input = self.wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, PROMPT_TEXTAREA_SELECTOR))
             )
@@ -167,18 +288,24 @@ class LeonardoBrowser:
             prompt_input.send_keys(prompt)
 
             generate_btn = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON_XPATH))
+                EC.element_to_be_clickable((By.XPATH, GENERATE_BUTTON_XPATH))
             )
             generate_btn.click()
 
             print("Generate button clicked! Waiting for results...")
-            time.sleep(30)
-
-            images = self.driver.find_elements(By.CSS_SELECTOR, GALLERY_IMAGE_SELECTOR)
-            return [img.get_attribute("src") for img in images[:4] if img.get_attribute("src")]
+            return self._wait_for_generation_results(existing_urls)
+        except BrowserPreflightError:
+            raise
         except Exception as exc:  # noqa: BLE001
-            print(f"Error during generation: {exc}")
-            return []
+            artifacts = self._capture_failure_artifacts(
+                "generation-selector-failure",
+                f"{type(exc).__name__}: {exc}",
+            )
+            artifact_hint = self._format_artifact_hint(artifacts)
+            raise RuntimeError(
+                "Leonardo browser generation failed before results were detected. "
+                f"{artifact_hint}"
+            ) from exc
 
     def close(self):
         self.driver.quit()

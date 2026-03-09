@@ -74,8 +74,8 @@ The dashboard binds to `127.0.0.1:6767`. Supported dashboard execution goes thro
 | `generate-api` | `LEONARDO_API_KEY` | Stable production path |
 | `generate-api --sync` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config | Uploads raw output to Canva |
 | `generate-api --autofill --export` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config, private `canva_templates` IDs in `config/prompts.local.yaml` | Public placeholder mappings are rejected |
-| `generate-browser` | `requirements-browser.txt`, local Chrome/Chromium | First login must be interactive |
-| Dashboard browser jobs | Bootstrapped `user_profile/` | Dashboard browser jobs run headless and fail fast until the profile is seeded |
+| `generate-browser` | `requirements-browser.txt`, local Chrome/Chromium | First login must be interactive; failures write local browser artifacts |
+| Dashboard browser jobs | Bootstrapped `user_profile/` | Dashboard browser jobs run headless, fail fast until the profile is seeded, and require an interactive re-bootstrap if the saved session expires |
 
 ## CLI Examples
 Works after clone once the matching credentials are configured:
@@ -86,6 +86,8 @@ python src/main.py generate-api social_banner_bg --sync --canva-folder "Shadowpu
 python src/main.py generate-browser "Twilight shadowpunk skyline with negative space"
 ```
 
+If Leonardo reports that the saved session expired, rerun `generate-browser` without `--headless` once to refresh `user_profile/`.
+
 Requires private Canva template IDs in `config/prompts.local.yaml`:
 ```bash
 python src/main.py generate-api madness_launch_key_art --autofill --export png
@@ -95,6 +97,7 @@ python src/main.py generate-api madness_launch_key_art --autofill --export png
 - Raw downloads: `dj_msqrvve_brand_system/outputs/raw/<run_id>/`
 - Canva exports: `dj_msqrvve_brand_system/outputs/exports/<run_id>/`
 - API ledger: `dj_msqrvve_brand_system/outputs/ledger.jsonl`
+- Browser failure artifacts: `dj_msqrvve_brand_system/outputs/browser-artifacts/<timestamp>-<phase>/`
 - Dashboard queue state: `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`
 
 If the dashboard restarts, queued jobs are restored and previously running jobs are marked failed with a restart-specific error so they can be retried safely.
@@ -110,7 +113,7 @@ If the dashboard restarts, queued jobs are restored and previously running jobs 
 ## Known Limitations
 - The dashboard queue is intentionally local-first and single-process; it is not a distributed worker system.
 - The dashboard API is intentionally localhost-only and binds to `127.0.0.1` by default.
-- Browser automation depends on Leonardo UI selectors and a locally bootstrapped Chrome profile.
+- Browser automation depends on Leonardo UI selectors and a locally bootstrapped Chrome profile. When the saved session expires or a selector breaks, inspect `outputs/browser-artifacts/` and refresh the profile with an interactive `generate-browser` run.
 - Ledger history reflects API runs; browser jobs remain queue-tracked but do not write the API ledger.
 
 ## Docs

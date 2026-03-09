@@ -50,6 +50,22 @@ python src/main.py generate-browser "your prompt"
 
 If Chrome is not on `PATH`, set `CHROME_BINARY` in the shell before running the command.
 
+Notes:
+- `generate-browser --headless` is only supported after the interactive bootstrap has already populated `user_profile/`.
+- If Leonardo redirects back to login or reports an expired saved session, rerun `python src/main.py generate-browser "your prompt"` without `--headless` to refresh the profile.
+- Browser failures write artifacts to `dj_msqrvve_brand_system/outputs/browser-artifacts/<timestamp>-<phase>/` with a screenshot, page dump, and metadata when available.
+
+## Browser Automation Smoke And Maintenance
+Supported smoke procedure:
+1. Run one interactive `generate-browser` command if the saved session is missing or expired.
+2. Run a headless smoke check with a short prompt:
+```bash
+cd dj_msqrvve_brand_system
+python src/main.py generate-browser "simple lighting smoke prompt" --headless
+```
+3. If the smoke check fails, inspect the newest directory under `outputs/browser-artifacts/` to see whether the issue was a login redirect, missing selector, or stalled result detection.
+4. If Leonardo changed its UI, update the selectors or readiness checks in `src/lib/leonardo_browser.py` and rerun `make health` and `make full-check`.
+
 ## Validation Commands
 From repo root:
 ```bash
