@@ -59,6 +59,13 @@ make health
 make full-check
 ```
 
+Automated validation remains local and mostly mocked. For live-provider readiness, use:
+```bash
+cd dj_msqrvve_brand_system
+python src/test_health.py
+python src/test_health.py smoke-plan --asset-key social_banner_bg
+```
+
 ### 5. Start the dashboard
 ```bash
 cd dashboard
@@ -67,6 +74,12 @@ npm run dev
 ```
 
 The dashboard binds to `127.0.0.1:6767`. Supported dashboard execution goes through the queue-backed `/api/jobs` routes only.
+
+## Validation Tiers
+- `make health`: Python unit tests plus a CLI help smoke check.
+- `make full-check`: `make health` plus dashboard lint, tests, and production build.
+- `python src/test_health.py`: manual live-provider auth checks against Leonardo and Canva.
+- `python src/test_health.py smoke-plan --asset-key <asset_key>`: local readiness summary plus the supported live smoke commands for Leonardo API, Canva sync/autofill/export, browser checks, and dashboard restart recovery.
 
 ## Workflow Matrix
 | Workflow | Requirements | Notes |
@@ -115,6 +128,7 @@ If the dashboard restarts, queued jobs are restored and previously running jobs 
 - The dashboard API is intentionally localhost-only and binds to `127.0.0.1` by default.
 - Browser automation depends on Leonardo UI selectors and a locally bootstrapped Chrome profile. When the saved session expires or a selector breaks, inspect `outputs/browser-artifacts/` and refresh the profile with an interactive `generate-browser` run.
 - Ledger history reflects API runs; browser jobs remain queue-tracked but do not write the API ledger.
+- There is no separate automated live-provider integration suite in CI. Provider auth and end-to-end smoke checks stay manual through `src/test_health.py` and the operations runbook.
 
 ## Docs
 - [Architecture](docs/ARCHITECTURE.md)

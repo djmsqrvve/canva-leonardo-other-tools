@@ -368,6 +368,29 @@ def test_generate_api_logs_failed_generation_stage(monkeypatch, tmp_path):
     _assert_stage_failed(entries, "generation")
 
 
+def test_generate_api_failure_prints_run_context(monkeypatch, tmp_path, capsys):
+    class StubLeoClient:
+        def generate_and_wait(self, **kwargs):
+            raise RuntimeError("generation crash")
+
+    monkeypatch.setattr(main_module, "LeonardoClient", StubLeoClient)
+    monkeypatch.setattr(main_module, "DEFAULT_OUTPUT_ROOT", tmp_path)
+
+    parser = main_module.create_parser()
+    args = parser.parse_args(["generate-api", "social_banner_bg", "--run-id", "run_context"])
+
+    with pytest.raises(RuntimeError, match="generation crash"):
+        main_module.run_generate_api(args, _config())
+
+    captured = capsys.readouterr()
+    assert "❌ API pipeline failed" in captured.out
+    assert "Run ID: run_context" in captured.out
+    assert "Failed stage: generation" in captured.out
+    assert f"Ledger: {tmp_path / 'ledger.jsonl'}" in captured.out
+    assert f"Raw output dir: {tmp_path / 'raw' / 'run_context'}" in captured.out
+    assert f"Export output dir: {tmp_path / 'exports' / 'run_context'}" in captured.out
+
+
 def test_generate_api_logs_failed_download_stage(monkeypatch, tmp_path):
     class StubLeoClient:
         def generate_and_wait(self, **kwargs):

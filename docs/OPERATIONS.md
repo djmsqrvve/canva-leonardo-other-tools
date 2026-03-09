@@ -6,6 +6,13 @@
 3. Install `requirements-browser.txt` only if you need browser automation.
 4. Copy `.env.example` to `.env` and fill the keys for the workflows you will use.
 
+## Validation Tiers
+- `make health` is the fast local validation path: Python tests plus a CLI help smoke check.
+- `make full-check` extends `make health` with dashboard lint, dashboard tests, and a production `next build`.
+- `python src/test_health.py` is the supported manual live-provider auth check for Leonardo and Canva.
+- `python src/test_health.py smoke-plan --asset-key <asset_key>` prints the supported live smoke sequence and local readiness state.
+- There is no CI-managed live-provider suite. External-provider smoke runs remain manual because they require tenant credentials, real Canva template IDs, and can create provider-side artifacts.
+
 ## Canva Auth Bootstrap
 Run:
 ```bash
@@ -65,6 +72,53 @@ python src/main.py generate-browser "simple lighting smoke prompt" --headless
 ```
 3. If the smoke check fails, inspect the newest directory under `outputs/browser-artifacts/` to see whether the issue was a login redirect, missing selector, or stalled result detection.
 4. If Leonardo changed its UI, update the selectors or readiness checks in `src/lib/leonardo_browser.py` and rerun `make health` and `make full-check`.
+
+## Live Provider Smoke Procedure
+Start with a local readiness summary:
+```bash
+cd dj_msqrvve_brand_system
+python src/test_health.py state --asset-key social_banner_bg
+python src/test_health.py auth
+python src/test_health.py smoke-plan --asset-key social_banner_bg
+```
+
+Supported manual smoke sequence:
+1. Leonardo API auth:
+```bash
+cd dj_msqrvve_brand_system
+python src/test_health.py auth --check leonardo
+```
+2. Canva auth and refresh readiness:
+```bash
+python src/test_health.py auth --check canva
+```
+3. Leonardo API generation smoke:
+```bash
+python src/main.py generate-api social_banner_bg --run-id smoke-social-banner-bg-api-<timestamp>
+```
+4. Canva sync smoke:
+```bash
+python src/main.py generate-api social_banner_bg --sync --canva-folder "Shadowpunk/Generations" --run-id smoke-social-banner-bg-sync-<timestamp>
+```
+5. Canva autofill and export smoke after real private template IDs are configured:
+```bash
+python src/main.py generate-api social_banner_bg --autofill --export png --run-id smoke-social-banner-bg-export-<timestamp>
+```
+6. Browser smoke:
+   Run the interactive bootstrap if the saved session is missing or expired.
+   Then run `python src/main.py generate-browser "simple lighting smoke prompt" --headless`.
+7. Dashboard restart recovery smoke:
+   Start `npm run dev` in `dashboard/`.
+   Queue a job until it reaches `running`.
+   Stop the dashboard process.
+   Restart `npm run dev`.
+   Confirm the interrupted job is surfaced as `failed` with a restart-specific error and can be retried.
+
+Failure diagnostics to inspect during live smoke:
+- API pipeline failures print the run ID, failed stage, ledger path, and output directories.
+- API run history is appended to `dj_msqrvve_brand_system/outputs/ledger.jsonl`.
+- Browser failures write artifacts under `dj_msqrvve_brand_system/outputs/browser-artifacts/`.
+- Dashboard restart behavior is persisted in `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`.
 
 ## Validation Commands
 From repo root:
