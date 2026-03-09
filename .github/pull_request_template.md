@@ -4,8 +4,7 @@
 
 ## Test Evidence
 - [ ] `make health`
-- [ ] `cd dashboard && npm run lint` (dashboard changes only)
-- [ ] `cd dashboard && npm run test` (dashboard changes only)
+- [ ] `make full-check` (dashboard/runtime changes)
 - Additional verification notes:
 
 ## Rollback Note

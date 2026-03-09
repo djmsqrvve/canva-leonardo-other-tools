@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBrandStore } from './store';
 import type { DashboardJob, LedgerRunSummary, JobStatus } from '@/lib/job-types';
@@ -304,6 +305,12 @@ export default function DashboardPage() {
                 />
                 <span className="text-[10px] uppercase text-purple-300/60">Use Browser Automation (Free Tokens)</span>
               </div>
+              {useBrowser ? (
+                <p className="text-[10px] text-white/40 leading-relaxed">
+                  Browser jobs run headless from the dashboard and require a bootstrapped local Chrome profile.
+                  If this is your first browser run, sign in once from the CLI without `--headless`.
+                </p>
+              ) : null}
 
               <button
                 onClick={() => void handleGenerate()}
@@ -399,9 +406,12 @@ export default function DashboardPage() {
                 {successfulJobs.map((job) => (
                   <div key={job.id} className="bg-black/40 border border-white/5 rounded-lg overflow-hidden group">
                     <div className="aspect-video bg-white/5 relative flex items-center justify-center overflow-hidden">
-                      <img
+                      <Image
                         src={job.urls[0]}
                         alt={job.prompt}
+                        fill
+                        unoptimized
+                        sizes="(min-width: 768px) 50vw, 100vw"
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                     </div>

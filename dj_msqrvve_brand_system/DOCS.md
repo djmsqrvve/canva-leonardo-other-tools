@@ -1,53 +1,40 @@
-# DJ MSQRVVE Brand System - Tools & Automation
+# Python CLI Notes
 
-This document outlines the reusable tools and helper scripts developed for the **Twilight Shadowpunk** asset pipeline.
+## Supported Entry Points
+- `src/main.py` is the maintained CLI.
+- `src/auth_server.py` is the local Canva OAuth bootstrap helper.
+- `src/cli.py` remains only as a deprecated compatibility scaffold.
 
-## 🛠 Project Structure
-
-- `src/apis/`: Reusable API clients.
-  - `canva_api.py`: Canva facade client.
-  - `canva/`: Canva module clients (assets, designs, autofill, exports).
-  - `leonardo_api.py`: Leonardo.Ai Production API wrapper (authenticated via `.env`).
-- `src/lib/leonardo_browser.py`: Browser-based automation for Leonardo.ai (uses Selenium + Chrome Profile).
-- `src/main.py`: The central CLI entry point for the brand system.
-- `src/auth_server.py`: Local OAuth server to handle Canva authentication and token generation.
-- `user_profile/`: Persistent Chrome profile directory used by browser automation to maintain logins (e.g., Canva SSO).
-
-## 🚀 Key Workflows
-
-### 1. Canva Authentication
-To generate your `CANVA_ACCESS_TOKEN`:
+## Install Profiles
 ```bash
-python src/auth_server.py
+pip install -r requirements-dev.txt
 ```
-*Note: Ensure `http://127.0.0.1:5000/oauth/callback` is in your Canva Redirect URLs.*
 
-### 2. Automated Generation (Browser Route)
-To generate assets using your free tokens (from the Canva Essential plan) without needing the Production API key:
+Optional browser support:
 ```bash
-python src/main.py generate-browser "your prompt"
+pip install -r requirements-browser.txt
 ```
-- **Login:** On the first run, the browser will open. Log in via Canva.
-- **Session:** Subsequent runs will use the saved session in `/user_profile`.
 
-### 3. API-Based Generation (Production Route)
-If you have a `LEONARDO_API_KEY` and credits:
+## Common Commands
+Production API generation:
 ```bash
 python src/main.py generate-api social_banner_bg
 python src/main.py generate-api social_banner_bg --sync
-python src/main.py generate-api social_banner_bg --sync --autofill --export png
 ```
 
-Optional flags:
-- `--sync`: upload generated local asset to Canva.
-- `--autofill`: run template autofill using configured `canva_templates`.
-- `--export <format>`: export the autofilled design (requires `--autofill`).
-- `--canva-folder <path>`: override upload folder (default `Shadowpunk/Generations`).
-- `--run-id <id>`: reuse run identity for idempotent retries.
-
-## 🧪 Testing
-Run the unit tests to ensure the libraries are healthy:
+Browser generation bootstrap:
 ```bash
-cd ..
-make test
+python src/main.py generate-browser "your prompt"
 ```
+
+Autofill and export after real template IDs are configured:
+```bash
+python src/main.py generate-api madness_launch_key_art --autofill --export png
+```
+
+## Notes
+- `--export` requires `--autofill`.
+- `generate-browser --headless` assumes the local `user_profile/` already contains a valid Leonardo login session.
+- `config/prompts.yaml` ships with placeholder Canva template IDs; autofill/export refuses to run until they are replaced.
+- Canva API calls can refresh expired access tokens when `CANVA_REFRESH_TOKEN`, `CANVA_CLIENT_ID`, and `CANVA_CLIENT_SECRET` are configured.
+- API runs write stage-by-stage ledger entries to `outputs/ledger.jsonl`.

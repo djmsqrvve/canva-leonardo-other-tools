@@ -4,11 +4,11 @@ Use this guide when assigning a new agent to the upgrade plan.
 
 ## Required Reading Order
 
-1. `docs/CANVA_LEONARDO_UPGRADE_MASTER_PLAN.md`
-2. `TODO_NEXT.md`
-3. `docs/SPRINT_1_ASSET_SYNC.md`
-4. `docs/SPRINT_2_AUTOFILL_PIPELINE.md`
-5. `docs/SPRINT_3_EXPORT_AND_MASTERY.md`
+1. `docs/archive/CANVA_LEONARDO_UPGRADE_MASTER_PLAN.md`
+2. `docs/archive/TODO_NEXT_2026-03-09.md`
+3. `docs/archive/SPRINT_1_ASSET_SYNC.md`
+4. `docs/archive/SPRINT_2_AUTOFILL_PIPELINE.md`
+5. `docs/archive/SPRINT_3_EXPORT_AND_MASTERY.md`
 6. `dj_msqrvve_brand_system/DOCS.md`
 
 ## Day 1 Startup Checklist

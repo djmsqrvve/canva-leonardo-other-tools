@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
 
@@ -6,6 +8,9 @@ import { buildGenerationCommand } from "./generation-command.js";
 
 const TERMINAL_STATUSES = new Set(["success", "failed", "canceled"]);
 const GLOBAL_RUNTIMES_KEY = "__djmsqrvve_job_runtimes";
+const PERSISTED_STATE_VERSION = 1;
+const RESTART_FAILURE_MESSAGE =
+  "Dashboard restarted while this job was running. Retry the job to continue.";
 
 function nowIso() {
   return new Date().toISOString();
@@ -26,6 +31,39 @@ function normalizeCompletion(result) {
   return { stdout, stderr, exitCode };
 }
 
+function normalizeStoredJob(job) {
+  if (!job || typeof job !== "object" || typeof job.id !== "string") {
+    return null;
+  }
+
+  return {
+    id: job.id,
+    status: typeof job.status === "string" ? job.status : "failed",
+    assetType: typeof job.assetType === "string" ? job.assetType : "unknown",
+    prompt: typeof job.prompt === "string" ? job.prompt : "",
+    useBrowser: Boolean(job.useBrowser),
+    runId: typeof job.runId === "string" ? job.runId : null,
+    createdAt: typeof job.createdAt === "string" ? job.createdAt : nowIso(),
+    startedAt: typeof job.startedAt === "string" ? job.startedAt : null,
+    finishedAt: typeof job.finishedAt === "string" ? job.finishedAt : null,
+    urls: Array.isArray(job.urls) ? job.urls.filter((value) => typeof value === "string") : [],
+    error: typeof job.error === "string" ? job.error : null,
+    retryOf: typeof job.retryOf === "string" ? job.retryOf : undefined,
+  };
+}
+
+function serializePersistedState(jobOrder, jobsById, queue) {
+  return {
+    version: PERSISTED_STATE_VERSION,
+    jobs: jobOrder.map((jobId) => jobsById.get(jobId)).filter(Boolean),
+    queue,
+  };
+}
+
+export function resolveJobStatePath(rootDir) {
+  return path.join(rootDir, "dj_msqrvve_brand_system", "outputs", "dashboard-jobs.json");
+}
+
 export class JobRuntime {
   /**
    * @param {{
@@ -33,6 +71,7 @@ export class JobRuntime {
    *   now?: () => string,
    *   generateJobId?: () => string,
    *   generateRunId?: () => string,
+   *   persistencePath?: string | null,
    * }} options
    */
   constructor(options) {
@@ -44,6 +83,7 @@ export class JobRuntime {
     this.now = options.now || nowIso;
     this.makeJobId = options.generateJobId || generateJobId;
     this.makeRunId = options.generateRunId || generateRunId;
+    this.persistencePath = options.persistencePath || null;
 
     /** @type {Map<string, Record<string, unknown>>} */
     this.jobsById = new Map();
@@ -56,6 +96,9 @@ export class JobRuntime {
     this.activeJobId = null;
     /** @type {{ kill?: (signal?: string) => boolean } | null} */
     this.activeChild = null;
+
+    this.#loadPersistedState();
+    this.#dispatch();
   }
 
   /**
@@ -86,6 +129,7 @@ export class JobRuntime {
     this.jobsById.set(id, job);
     this.jobOrder.unshift(id);
     this.queue.push(id);
+    this.#persist();
     this.#dispatch();
 
     return this.#serialize(job);
@@ -131,6 +175,7 @@ export class JobRuntime {
       job.status = "canceled";
       job.finishedAt = this.now();
       job.error = null;
+      this.#persist();
       return { ok: true, job: this.#serialize(job) };
     }
 
@@ -147,6 +192,7 @@ export class JobRuntime {
         job.error = getErrorMessage(error);
       }
 
+      this.#persist();
       return { ok: true, job: this.#serialize(job) };
     }
 
@@ -186,6 +232,68 @@ export class JobRuntime {
     return { ok: true, job: retriedJob };
   }
 
+  #loadPersistedState() {
+    if (!this.persistencePath || !fs.existsSync(this.persistencePath)) {
+      return;
+    }
+
+    try {
+      const raw = fs.readFileSync(this.persistencePath, "utf8");
+      if (!raw.trim()) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const persistedJobs = Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+      const persistedQueue = Array.isArray(parsed?.queue)
+        ? parsed.queue.filter((jobId) => typeof jobId === "string")
+        : [];
+
+      let recovered = false;
+      for (const storedJob of persistedJobs) {
+        const normalized = normalizeStoredJob(storedJob);
+        if (!normalized) {
+          continue;
+        }
+
+        // A prior Node process cannot hand off a live child process safely, so interrupted
+        // work is surfaced as retryable failure while queued work is preserved.
+        if (normalized.status === "running") {
+          normalized.status = "failed";
+          normalized.finishedAt = this.now();
+          normalized.error = RESTART_FAILURE_MESSAGE;
+          normalized.urls = [];
+          recovered = true;
+        }
+
+        this.jobsById.set(normalized.id, normalized);
+        this.jobOrder.push(normalized.id);
+      }
+
+      const queuedFromDisk = persistedQueue.filter((jobId) => this.jobsById.get(jobId)?.status === "queued");
+      const missingQueuedJobs = this.jobOrder.filter(
+        (jobId) => this.jobsById.get(jobId)?.status === "queued" && !queuedFromDisk.includes(jobId),
+      );
+      this.queue = [...queuedFromDisk, ...missingQueuedJobs];
+
+      if (recovered || missingQueuedJobs.length > 0) {
+        this.#persist();
+      }
+    } catch (error) {
+      console.warn("Unable to restore dashboard job state:", getErrorMessage(error));
+    }
+  }
+
+  #persist() {
+    if (!this.persistencePath) {
+      return;
+    }
+
+    const payload = serializePersistedState(this.jobOrder, this.jobsById, this.queue);
+    fs.mkdirSync(path.dirname(this.persistencePath), { recursive: true });
+    fs.writeFileSync(this.persistencePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  }
+
   #dispatch() {
     if (this.activeJobId) {
       return;
@@ -193,11 +301,13 @@ export class JobRuntime {
 
     const nextJobId = this.queue.shift();
     if (!nextJobId) {
+      this.#persist();
       return;
     }
 
     const job = this.jobsById.get(nextJobId);
     if (!job || job.status !== "queued") {
+      this.#persist();
       this.#dispatch();
       return;
     }
@@ -214,6 +324,7 @@ export class JobRuntime {
       job.status = "failed";
       job.finishedAt = this.now();
       job.error = getErrorMessage(error);
+      this.#persist();
       this.#dispatch();
       return;
     }
@@ -222,12 +333,14 @@ export class JobRuntime {
       job.status = "failed";
       job.finishedAt = this.now();
       job.error = "Job runner did not return a completion promise.";
+      this.#persist();
       this.#dispatch();
       return;
     }
 
     this.activeJobId = nextJobId;
     this.activeChild = startedJob.child || null;
+    this.#persist();
 
     startedJob.completion
       .then((result) => {
@@ -241,6 +354,7 @@ export class JobRuntime {
           this.activeJobId = null;
           this.activeChild = null;
         }
+        this.#persist();
         this.#dispatch();
       });
   }
@@ -255,6 +369,7 @@ export class JobRuntime {
       if (!job.finishedAt) {
         job.finishedAt = this.now();
       }
+      this.#persist();
       return;
     }
 
@@ -269,6 +384,7 @@ export class JobRuntime {
       job.urls = [];
     }
     job.finishedAt = this.now();
+    this.#persist();
   }
 
   #failJob(jobId, error) {
@@ -281,6 +397,7 @@ export class JobRuntime {
       if (!job.finishedAt) {
         job.finishedAt = this.now();
       }
+      this.#persist();
       return;
     }
 
@@ -288,6 +405,7 @@ export class JobRuntime {
     job.finishedAt = this.now();
     job.error = getErrorMessage(error);
     job.urls = [];
+    this.#persist();
   }
 
   #serialize(job) {
@@ -379,7 +497,13 @@ export function getJobRuntime(rootDir) {
 
   const runtimeMap = globalThis[GLOBAL_RUNTIMES_KEY];
   if (!runtimeMap.has(rootDir)) {
-    runtimeMap.set(rootDir, new JobRuntime({ startJob: createProcessRunner(rootDir) }));
+    runtimeMap.set(
+      rootDir,
+      new JobRuntime({
+        startJob: createProcessRunner(rootDir),
+        persistencePath: resolveJobStatePath(rootDir),
+      }),
+    );
   }
 
   return runtimeMap.get(rootDir);

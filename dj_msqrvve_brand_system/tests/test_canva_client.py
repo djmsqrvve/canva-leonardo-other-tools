@@ -2,8 +2,21 @@ import os
 import pytest
 import responses
 from apis.canva_api import CanvaClient
-from lib.errors import ApiResponseError
+from apis.canva.auth import TOKEN_URL
+from lib.errors import ApiResponseError, AuthError
 from responses.matchers import query_param_matcher
+
+
+@pytest.fixture(autouse=True)
+def clear_canva_env(monkeypatch):
+    for key in (
+        "CANVA_ACCESS_TOKEN",
+        "CANVA_REFRESH_TOKEN",
+        "CANVA_CLIENT_ID",
+        "CANVA_CLIENT_SECRET",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
 
 @pytest.fixture
 def mock_env(monkeypatch):
@@ -241,3 +254,163 @@ def test_upload_asset_terminal_failed_status_raises(mock_env, tmp_path, monkeypa
 
     with pytest.raises(ApiResponseError, match="failed with status"):
         client.upload_asset(str(file_path), folder_id="folder_generations")
+
+
+@responses.activate
+def test_request_retries_after_refresh_and_persists_rotated_tokens(tmp_path, monkeypatch):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "CANVA_ACCESS_TOKEN=expired_token\nCANVA_REFRESH_TOKEN=refresh_old\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CANVA_ACCESS_TOKEN", "expired_token")
+    monkeypatch.setenv("CANVA_REFRESH_TOKEN", "refresh_old")
+    monkeypatch.setenv("CANVA_CLIENT_ID", "client_123")
+    monkeypatch.setenv("CANVA_CLIENT_SECRET", "secret_456")
+
+    client = CanvaClient(env_file_path=str(env_path))
+
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/folders/root/items",
+        status=401,
+        match=[query_param_matcher({"item_types": "folder"})],
+    )
+    responses.add(
+        responses.POST,
+        TOKEN_URL,
+        json={"access_token": "fresh_access", "refresh_token": "refresh_new"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/folders/root/items",
+        json={"items": []},
+        status=200,
+        match=[query_param_matcher({"item_types": "folder"})],
+    )
+
+    payload = client.assets.list_folder_items("root", item_types="folder")
+
+    assert payload == {"items": []}
+    assert client.access_token == "fresh_access"
+    assert client.refresh_token == "refresh_new"
+    assert os.environ["CANVA_ACCESS_TOKEN"] == "fresh_access"
+    assert os.environ["CANVA_REFRESH_TOKEN"] == "refresh_new"
+
+    env_text = env_path.read_text(encoding="utf-8")
+    assert "CANVA_ACCESS_TOKEN=fresh_access" in env_text
+    assert "CANVA_REFRESH_TOKEN=refresh_new" in env_text
+
+    api_calls = [
+        call.request.headers["Authorization"]
+        for call in responses.calls
+        if call.request.url.startswith(f"{client.BASE_URL}/folders/root/items")
+    ]
+    assert api_calls == ["Bearer expired_token", "Bearer fresh_access"]
+
+    refresh_body = responses.calls[1].request.body
+    if isinstance(refresh_body, bytes):
+        refresh_body = refresh_body.decode("utf-8")
+    assert "grant_type=refresh_token" in refresh_body
+    assert "refresh_token=refresh_old" in refresh_body
+
+
+@responses.activate
+def test_request_refresh_failure_surfaces_auth_error(monkeypatch):
+    monkeypatch.setenv("CANVA_ACCESS_TOKEN", "expired_token")
+    monkeypatch.setenv("CANVA_REFRESH_TOKEN", "refresh_old")
+    monkeypatch.setenv("CANVA_CLIENT_ID", "client_123")
+    monkeypatch.setenv("CANVA_CLIENT_SECRET", "secret_456")
+
+    client = CanvaClient()
+
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/folders/root/items",
+        status=401,
+        match=[query_param_matcher({"item_types": "folder"})],
+    )
+    responses.add(
+        responses.POST,
+        TOKEN_URL,
+        json={"error": "invalid_grant"},
+        status=400,
+    )
+
+    with pytest.raises(AuthError, match="refresh failed"):
+        client.assets.list_folder_items("root", item_types="folder")
+
+    api_call_count = sum(
+        1
+        for call in responses.calls
+        if call.request.url.startswith(f"{client.BASE_URL}/folders/root/items")
+    )
+    assert api_call_count == 1
+
+
+@responses.activate
+def test_request_without_refresh_token_raises_auth_error(monkeypatch):
+    monkeypatch.delenv("CANVA_REFRESH_TOKEN", raising=False)
+    monkeypatch.delenv("CANVA_CLIENT_ID", raising=False)
+    monkeypatch.delenv("CANVA_CLIENT_SECRET", raising=False)
+
+    client = CanvaClient(access_token="expired_token")
+
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/folders/root/items",
+        status=401,
+        match=[query_param_matcher({"item_types": "folder"})],
+    )
+
+    with pytest.raises(AuthError):
+        client.assets.list_folder_items("root", item_types="folder")
+
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_refresh_without_rotated_refresh_token_keeps_existing_value(tmp_path, monkeypatch):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "CANVA_ACCESS_TOKEN=expired_token\nCANVA_REFRESH_TOKEN=refresh_old\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CANVA_ACCESS_TOKEN", "expired_token")
+    monkeypatch.setenv("CANVA_REFRESH_TOKEN", "refresh_old")
+    monkeypatch.setenv("CANVA_CLIENT_ID", "client_123")
+    monkeypatch.setenv("CANVA_CLIENT_SECRET", "secret_456")
+
+    client = CanvaClient(env_file_path=str(env_path))
+
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/folders/root/items",
+        status=403,
+        match=[query_param_matcher({"item_types": "folder"})],
+    )
+    responses.add(
+        responses.POST,
+        TOKEN_URL,
+        json={"access_token": "fresh_access"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/folders/root/items",
+        json={"items": []},
+        status=200,
+        match=[query_param_matcher({"item_types": "folder"})],
+    )
+
+    payload = client.assets.list_folder_items("root", item_types="folder")
+
+    assert payload == {"items": []}
+    assert client.access_token == "fresh_access"
+    assert client.refresh_token == "refresh_old"
+    assert os.environ["CANVA_REFRESH_TOKEN"] == "refresh_old"
+
+    env_text = env_path.read_text(encoding="utf-8")
+    assert "CANVA_ACCESS_TOKEN=fresh_access" in env_text
+    assert env_text.count("CANVA_REFRESH_TOKEN=refresh_old") == 1

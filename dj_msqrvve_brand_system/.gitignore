@@ -10,4 +10,6 @@ user_profile/
 # Build outputs
 dist/
 build/
+outputs/
+assets_out/
 *.egg-info/

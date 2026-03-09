@@ -1,32 +1,59 @@
-import os
 from typing import Any, Optional
 
 from .canva.assets import AssetsClient
 from .canva.designs import DesignsClient
 from .canva.autofill import AutofillClient
 from .canva.exports import ExportsClient
+from .canva.auth import CanvaTokenManager
 from lib.errors import ApiResponseError
 from lib.utils import extract_nested, poll_job
+
 
 class CanvaClient:
     """
     Facade class for the Canva Connect API.
     Combines specialized modules for convenience while maintaining modularity.
     """
-    def __init__(self, access_token=None):
-        self.access_token = access_token or os.environ.get("CANVA_ACCESS_TOKEN")
-        
-        self.assets = AssetsClient(self.access_token)
-        self.designs = DesignsClient(self.access_token)
-        self.autofill = AutofillClient(self.access_token)
-        self.exports = ExportsClient(self.access_token)
-        
-        # Shortcuts for common methods (backward compatibility)
-        self.headers = self.assets.headers
-        self.BASE_URL = self.assets.BASE_URL
+    BASE_URL = AssetsClient.BASE_URL
+
+    def __init__(
+        self,
+        access_token=None,
+        *,
+        refresh_token: str | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        env_file_path: str | None = None,
+        timeout_seconds: int = 30,
+    ):
+        self.token_manager = CanvaTokenManager(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            client_id=client_id,
+            client_secret=client_secret,
+            env_file_path=env_file_path,
+            timeout_seconds=timeout_seconds,
+        )
+
+        self.assets = AssetsClient(token_manager=self.token_manager, timeout_seconds=timeout_seconds)
+        self.designs = DesignsClient(token_manager=self.token_manager, timeout_seconds=timeout_seconds)
+        self.autofill = AutofillClient(token_manager=self.token_manager, timeout_seconds=timeout_seconds)
+        self.exports = ExportsClient(token_manager=self.token_manager, timeout_seconds=timeout_seconds)
+
+    @property
+    def access_token(self) -> str | None:
+        return self.token_manager.access_token
+
+    @property
+    def refresh_token(self) -> str | None:
+        return self.token_manager.refresh_token
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return self.assets.headers
 
     def _require_token(self) -> None:
-        if not self.access_token:
+        if not self.access_token and not self.token_manager.can_refresh:
             raise ValueError("Cannot call API without access token.")
 
     def _extract_status(self, payload: dict[str, Any]) -> Optional[str]:
@@ -66,6 +93,10 @@ class CanvaClient:
     def get_or_create_shadowpunk_folder(self, folder_path: str = "Shadowpunk/Generations") -> str:
         self._require_token()
         return self.assets.get_or_create_folder_path(folder_path)
+
+    def get_current_user(self) -> dict[str, Any]:
+        self._require_token()
+        return self.assets._get("/users/me")
 
     def upload_asset(
         self,

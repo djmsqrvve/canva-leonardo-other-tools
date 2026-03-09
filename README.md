@@ -1,105 +1,113 @@
-# DJ MSQRVVE // Twilight Shadowpunk Asset Pipeline
+[![CI](https://github.com/djmsqrvve/canva-leonardo-other-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/djmsqrvve/canva-leonardo-other-tools/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A comprehensive suite of tools for automating the generation of "Twilight Shadowpunk" branded assets for social media, live streaming, and game development.
+# Twilight Shadowpunk Asset Pipeline
 
-## 🌌 Overview
-This project bridges the creative power of **Leonardo.Ai** with the layout precision of **Canva Connect API**, orchestrated through a Python-based automation engine and a sleek **Next.js Dashboard**.
+Local-first automation for generating Leonardo imagery, syncing assets into Canva, and monitoring jobs from a Next.js dashboard.
 
-### Key Aesthetic: Twilight Shadowpunk
-- **Themes:** Neon-Deco, Googie-Atomic, Usonian-Luxe, Masquerave-Noir.
-- **Palette:** Deep twilight purples, electric teals, warm amber neon, organic mossy greens, dark noir blacks.
+## What Is Supported
+- Python CLI for Leonardo API generation, Canva sync, Canva autofill, and Canva export.
+- Local browser automation for Leonardo web generation after an interactive login bootstrap.
+- Next.js dashboard for queueing jobs, monitoring status, and reviewing ledger-backed history.
 
----
+## Quick Start
+### 1. Install Python dependencies
+```bash
+cd dj_msqrvve_brand_system
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+```
 
-## 🛠 Project Components
+Optional browser automation dependencies:
+```bash
+pip install -r requirements-browser.txt
+```
 
-### 1. Brand System CLI (`dj_msqrvve_brand_system/`)
-The core Python engine for asset generation.
-- **`src/main.py`**: Unified entry point for all generation tasks.
-- **`src/apis/`**: Canva and Leonardo API clients.
-- **`src/lib/leonardo_browser.py`**: Browser automation flow for Leonardo web generation.
-- **`config/prompts.yaml`**: The master "Shadowpunk" prompt library.
+### 2. Configure environment
+```bash
+cp .env.example .env
+```
 
-### 2. Dashboard (`dashboard/`)
-A Next.js 16 control center running on **port 6767**.
-- Trigger generations visually.
-- Preview outputs in a "Shadowpunk" styled gallery.
-- Manage both Browser-based (Free) and API-based (Production) workflows.
+Set the keys you need:
+- `LEONARDO_API_KEY` for `generate-api`
+- `CANVA_CLIENT_ID` and `CANVA_CLIENT_SECRET` for local Canva OAuth bootstrap and token refresh
+- `CANVA_ACCESS_TOKEN` for Canva sync/autofill/export
+- `CANVA_REFRESH_TOKEN` if you want the runtime to auto-renew expired Canva access tokens
+- `CANVA_INCLUDE_AUTOFILL_SCOPES=1` if you want the auth helper to request brand-template scopes
 
-### 3. Stream Operations (`stream_ops/`)
-- **`obs_assets/`**: HTML/CSS/JS overlays featuring animated chevron motifs and bioluminescent pulses.
-- **`api_server/`**: FastAPI implementation for dynamic, AI-generated stream alerts.
+If `CANVA_REFRESH_TOKEN`, `CANVA_CLIENT_ID`, and `CANVA_CLIENT_SECRET` are set, Canva API calls retry once on `401` or `403` by refreshing the access token. Refreshed values are written back to `dj_msqrvve_brand_system/.env` when that file exists.
 
-### 4. Game Assets (`game_assets/`)
-- Folders organized for **Helix 2000** (2D) and **Helix MAIN GAME** (3D).
-- Ready for sprite atlases, PBR textures, and environmental concept art.
+### 3. Bootstrap Canva auth when needed
+```bash
+python src/auth_server.py
+```
 
----
+The auth helper saves `CANVA_ACCESS_TOKEN` and, when Canva returns one, `CANVA_REFRESH_TOKEN`.
 
-## 🚀 Getting Started
+### 4. Validate the repo
+```bash
+cd ..
+make health
+make full-check
+```
 
-### Prerequisites
-- Python 3.13+
-- Node.js 18+
-- Leonardo.Ai account (linked via Canva for free tokens)
-- Canva Business/Enterprise account
+### 5. Start the dashboard
+```bash
+cd dashboard
+npm install
+npm run dev
+```
 
-### Setup
-1. **Initialize Python Environment:**
-   ```bash
-   cd dj_msqrvve_brand_system
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. **Configure Environment:**
-   - Copy `.env.example` to `.env`.
-   - Add your `LEONARDO_API_KEY`, `CANVA_CLIENT_ID`, and `CANVA_CLIENT_SECRET`.
-3. **Authenticate Canva:**
-   ```bash
-   python src/auth_server.py
-   ```
-   *Follow the URL to generate your access token.*
-4. **Launch Dashboard:**
-   ```bash
-   cd dashboard
-   npm install
-   npm run dev
-   ```
-   *Access at http://localhost:6767*
+The dashboard runs at `http://localhost:6767`.
 
-### Core CLI Commands
+## Workflow Matrix
+| Workflow | Requirements | Notes |
+| --- | --- | --- |
+| `generate-api` | `LEONARDO_API_KEY` | Stable production path |
+| `generate-api --sync` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config | Uploads raw output to Canva |
+| `generate-api --autofill --export` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config, real `canva_templates` IDs | Template IDs are tenant-specific and placeholders are rejected |
+| `generate-browser` | `requirements-browser.txt`, local Chrome/Chromium | First login must be interactive |
+| Dashboard browser jobs | Bootstrapped `user_profile/` | Dashboard browser jobs run headless and fail fast until the profile is seeded |
+
+## CLI Examples
+Works after clone once the matching credentials are configured:
 ```bash
 cd dj_msqrvve_brand_system
 python src/main.py generate-api social_banner_bg
 python src/main.py generate-api social_banner_bg --sync --canva-folder "Shadowpunk/Generations"
-python src/main.py generate-api social_banner_bg --sync --autofill --export png
+python src/main.py generate-browser "Twilight shadowpunk skyline with negative space"
 ```
 
-Output artifacts and ledger are written under:
-- `dj_msqrvve_brand_system/outputs/raw/<run_id>/`
-- `dj_msqrvve_brand_system/outputs/canva/<run_id>/`
-- `dj_msqrvve_brand_system/outputs/exports/<run_id>/`
-- `dj_msqrvve_brand_system/outputs/ledger.jsonl`
-
-## 🧪 Testing
-Run the comprehensive test suite to ensure pipeline health:
+Requires real Canva template IDs in `config/prompts.yaml`:
 ```bash
-make test
+python src/main.py generate-api madness_launch_key_art --autofill --export png
 ```
 
-Quick local environment validation:
-```bash
-make health
-```
+## Outputs and State
+- Raw downloads: `dj_msqrvve_brand_system/outputs/raw/<run_id>/`
+- Canva exports: `dj_msqrvve_brand_system/outputs/exports/<run_id>/`
+- API ledger: `dj_msqrvve_brand_system/outputs/ledger.jsonl`
+- Dashboard queue state: `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`
 
----
+If the dashboard restarts, queued jobs are restored and previously running jobs are marked failed with a restart-specific error so they can be retried safely.
 
-## 📝 Documentation
-For deeper technical details, see:
-- `docs/DJ_MSQRVVE_RESEARCH_REPORT.md`: Full research and architecture.
-- `dj_msqrvve_brand_system/DOCS.md`: CLI and library usage.
-- `docs/CANVA_SETUP_GUIDE.md`: Integration setup steps.
-- `docs/CANVA_LEONARDO_UPGRADE_MASTER_PLAN.md`: Full-stack upgrade roadmap (phased).
-- `docs/CANVA_LEONARDO_UPGRADE_AGENT_HANDOFF.md`: New-agent execution and handoff guide.
-- `CONTRIBUTING.md`: Commit standards and validation workflow.
+## Repo Map
+- `dj_msqrvve_brand_system/` - active Python CLI, API clients, auth helper, tests
+- `dashboard/` - active Next.js dashboard and API routes
+- `docs/` - active architecture and operations docs
+- `docs/archive/` - historical planning, sprint, and handoff material
+- `archive/` - archived prototype/scaffold code
+- `assets/`, `game_assets/`, `stream_ops/`, `shared/`, `bevy_project/`, `pipeline_scripts/` - reference assets or adjacent project material
+
+## Known Limitations
+- The dashboard queue is intentionally local-first and single-process; it is not a distributed worker system.
+- Browser automation depends on Leonardo UI selectors and a locally bootstrapped Chrome profile.
+- Ledger history reflects API runs; browser jobs remain queue-tracked but do not write the API ledger.
+
+## Docs
+- [Architecture](docs/ARCHITECTURE.md)
+- [Operations](docs/OPERATIONS.md)
+- [Python CLI Notes](dj_msqrvve_brand_system/DOCS.md)
+- [Contributing](CONTRIBUTING.md)
+- [Archived historical docs](docs/archive/README.md)

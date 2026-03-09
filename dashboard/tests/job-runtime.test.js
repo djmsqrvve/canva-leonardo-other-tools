@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
-import { JobRuntime } from '../src/lib/job-runtime.js';
+import { JobRuntime, resolveJobStatePath } from '../src/lib/job-runtime.js';
 
 function flushAsync() {
   return new Promise((resolve) => {
@@ -17,6 +20,10 @@ function deferred() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+function makeTempRoot() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'dj-job-runtime-'));
 }
 
 test('JobRuntime dispatches queued jobs serially with a single worker', async () => {
@@ -191,4 +198,93 @@ test('JobRuntime retry clones failed job with new runId and retryOf link', async
   await flushAsync();
   const retried = runtime.getJob('job-2');
   assert.equal(retried?.status, 'success');
+});
+
+test('JobRuntime persists job state for recovery', async () => {
+  const rootDir = makeTempRoot();
+  const persistencePath = resolveJobStatePath(rootDir);
+  const running = deferred();
+
+  const runtime = new JobRuntime({
+    startJob: () => ({
+      child: { kill: () => true },
+      completion: running.promise,
+    }),
+    generateJobId: () => 'job-1',
+    generateRunId: () => 'run-1',
+    persistencePath,
+  });
+
+  runtime.enqueueJob({ assetType: 'social_banner_bg', prompt: 'prompt', useBrowser: false });
+
+  const persisted = JSON.parse(fs.readFileSync(persistencePath, 'utf8'));
+  assert.equal(persisted.version, 1);
+  assert.equal(persisted.jobs[0].status, 'running');
+  assert.deepEqual(persisted.queue, []);
+
+  running.resolve({ stdout: '', stderr: '', exitCode: 0 });
+  await flushAsync();
+});
+
+test('JobRuntime restores queued jobs and marks interrupted jobs as failed', async () => {
+  const rootDir = makeTempRoot();
+  const persistencePath = resolveJobStatePath(rootDir);
+  fs.mkdirSync(path.dirname(persistencePath), { recursive: true });
+  fs.writeFileSync(
+    persistencePath,
+    `${JSON.stringify(
+      {
+        version: 1,
+        jobs: [
+          {
+            id: 'job-1',
+            status: 'running',
+            assetType: 'social_banner_bg',
+            prompt: 'first',
+            useBrowser: false,
+            runId: 'run-1',
+            createdAt: '2026-03-09T00:00:00Z',
+            startedAt: '2026-03-09T00:00:01Z',
+            finishedAt: null,
+            urls: [],
+            error: null,
+          },
+          {
+            id: 'job-2',
+            status: 'queued',
+            assetType: 'profile_avatar',
+            prompt: 'second',
+            useBrowser: true,
+            runId: null,
+            createdAt: '2026-03-09T00:00:02Z',
+            startedAt: null,
+            finishedAt: null,
+            urls: [],
+            error: null,
+          },
+        ],
+        queue: ['job-2'],
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  const running = deferred();
+  const runtime = new JobRuntime({
+    startJob: () => ({
+      child: { kill: () => true },
+      completion: running.promise,
+    }),
+    now: () => '2026-03-09T00:00:10Z',
+    persistencePath,
+  });
+
+  assert.equal(runtime.getJob('job-1')?.status, 'failed');
+  assert.match(runtime.getJob('job-1')?.error || '', /Dashboard restarted/);
+  assert.equal(runtime.getJob('job-2')?.status, 'running');
+
+  running.resolve({ stdout: '', stderr: '', exitCode: 0 });
+  await flushAsync();
 });

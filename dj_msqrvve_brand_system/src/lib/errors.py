@@ -34,6 +34,18 @@ class TimeoutError(ApiResponseError):
     """Raised when requests or asynchronous jobs time out."""
 
 
+class ConfigurationError(RuntimeError):
+    """Raised for invalid local setup or unsupported runtime configuration."""
+
+
+class OptionalDependencyError(ConfigurationError):
+    """Raised when an optional feature needs dependencies that are not installed."""
+
+
+class BrowserPreflightError(ConfigurationError):
+    """Raised when browser automation cannot safely start."""
+
+
 def raise_for_http_error(response: requests.Response) -> None:
     """Map HTTP status failures into typed exceptions."""
     status_code = response.status_code

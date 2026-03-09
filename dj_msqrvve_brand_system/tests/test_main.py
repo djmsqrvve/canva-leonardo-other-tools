@@ -58,6 +58,18 @@ def test_generate_api_export_requires_autofill():
         main_module.run_generate_api(args, _config())
 
 
+def test_create_leonardo_browser_surfaces_optional_dependency_error(monkeypatch):
+    def fake_import(_module_name):
+        exc = ModuleNotFoundError("No module named 'selenium'")
+        exc.name = "selenium"
+        raise exc
+
+    monkeypatch.setattr(main_module, "import_module", fake_import)
+
+    with pytest.raises(main_module.OptionalDependencyError, match="requirements-browser.txt"):
+        main_module.create_leonardo_browser(headless=True)
+
+
 def test_generate_api_sync_uploads_and_writes_ledger(monkeypatch, tmp_path):
     leo_instances = []
     canva_instances = []

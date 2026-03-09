@@ -1,37 +1,24 @@
 # Dashboard
 
-Next.js control surface for triggering and monitoring generation workflows.
+Next.js control surface for local job queueing, monitoring, and gallery/history review.
 
-## Development
-
+## Local Development
 ```bash
+npm install
 npm run dev
 ```
 
-Runs on [http://localhost:6767](http://localhost:6767).
+Runs on `http://localhost:6767`.
 
-## Quality Checks
-
+## Supported Checks
 ```bash
 npm run lint
 npm run test
-```
-
-## Build
-
-```bash
 npm run build
-npm run start
 ```
 
-## Notes
-
-- API trigger route: `src/app/api/generate/route.ts`
-- UI entrypoint: `src/app/page.tsx`
-- Uses project-level Python CLI under `../dj_msqrvve_brand_system`
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Runtime Notes
+- The dashboard shells out to `../dj_msqrvve_brand_system/src/main.py`.
+- Job state is persisted to `../dj_msqrvve_brand_system/outputs/dashboard-jobs.json`.
+- Browser automation jobs run headless and require an existing bootstrapped Chrome profile.
+- The queue is intentionally single-worker and local-first.

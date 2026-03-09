@@ -26,7 +26,8 @@ def test_api_health():
             # Fetch user info as a simple check
             response = requests.get(
                 f"{client.BASE_URL}/me",
-                headers=client.headers
+                headers=client.headers,
+                timeout=30,
             )
             if response.ok:
                 print("✅ Leonardo.Ai: Authentication Successful!")
@@ -40,25 +41,18 @@ def test_api_health():
 
     # 2. Canva Connect API Health Check
     canva_token = os.environ.get("CANVA_ACCESS_TOKEN")
-    if canva_token:
+    canva_refresh = os.environ.get("CANVA_REFRESH_TOKEN")
+    if canva_token or canva_refresh:
         try:
             client = CanvaClient(canva_token)
-            # Fetch user profile as a simple check
-            response = requests.get(
-                f"{client.BASE_URL}/users/me",
-                headers=client.headers
-            )
-            if response.ok:
+            user_data = client.get_current_user()
+            if user_data:
                 print("✅ Canva Connect: Authentication Successful!")
-                user_data = response.json()
                 print(f"   Connected as: {user_data.get('user', {}).get('display_name', 'Unknown')}")
-            else:
-                print(f"❌ Canva Connect: Authentication Failed ({response.status_code})")
-                print(f"   Response: {response.text}")
         except Exception as e:
             print(f"❌ Canva Connect: Error - {str(e)}")
     else:
-        print("⚠️ Canva Connect: CANVA_ACCESS_TOKEN not found in .env")
+        print("⚠️ Canva Connect: CANVA_ACCESS_TOKEN or CANVA_REFRESH_TOKEN not found in .env")
 
     print("="*40 + "\n")
 

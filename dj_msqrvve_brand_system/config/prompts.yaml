@@ -123,6 +123,8 @@ prompts:
     width: 2048
     height: 1024
 
+# Replace TEMPLATE_ID_HERE with real tenant-specific Canva template IDs before using
+# --autofill or --export. The CLI refuses to run autofill/export against placeholders.
 canva_templates:
   twitch_starting_soon: "TEMPLATE_ID_HERE"
   youtube_thumbnail: "TEMPLATE_ID_HERE"

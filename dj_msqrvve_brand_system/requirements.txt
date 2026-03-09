@@ -1,7 +1,1 @@
-requests
-PyYAML
-pytest
-python-dotenv
-responses
-Flask
-pkce
+-r requirements-dev.txt

@@ -1,62 +1,53 @@
 # Contributing Guide
 
+## Setup
+```bash
+cd dj_msqrvve_brand_system
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+cd ../dashboard
+npm install
+```
+
+Install browser dependencies only if you are working on `generate-browser`:
+```bash
+cd ../dj_msqrvve_brand_system
+pip install -r requirements-browser.txt
+```
+
 ## Workflow
+1. Start from a clean `main` branch.
+2. Create a focused branch.
+3. Make one coherent change at a time.
+4. Run the supported validation commands.
+5. Open a PR with clear scope, risk, and rollback notes.
 
-1. Start from a clean `main` and create a focused branch:
-```bash
-git checkout main
-git pull --ff-only origin main
-git checkout -b feature/<short-scope>
-```
-2. Make focused changes and verify locally:
-```bash
-make health
-```
-3. Commit in small units with clear intent.
-4. Push the branch and open a PR using `.github/pull_request_template.md`.
-5. Merge to `main` only after test evidence is documented.
-
-## Commit Message Standard
-
-Use conventional-style commits:
-
-```text
-type(scope): short summary
-
-Optional body with why/impact.
-```
-
-Common `type` values:
-- `feat`: new behavior
-- `fix`: bug fix
-- `refactor`: code change without behavior change
-- `test`: test additions/updates
-- `docs`: documentation only
-- `chore`: maintenance/tooling
-
-Examples:
-- `feat(canva): add asset upload job polling`
-- `fix(cli): handle missing prompt keys with explicit error`
-- `docs(setup): align README commands with main.py interface`
-
-## History Rules
-
-- Keep one concern per commit.
-- Do not mix unrelated docs/code/test changes.
-- Include a body when behavior changes, noting risk and validation.
-- Never force-push `main`.
-- Prefer `git pull --ff-only` to avoid accidental merge commits.
-
-## Validation Checklist
-
-Before pushing:
-
+## Validation
+Required for all code changes:
 ```bash
 make health
 ```
 
-For UI/API changes in dashboard:
-
+Required for dashboard changes and recommended before every PR:
 ```bash
 make full-check
 ```
+
+## Commit Style
+Use conventional-style subjects:
+
+```text
+type(scope): short summary
+```
+
+Examples:
+- `fix(auth): validate canva oauth state`
+- `docs(readme): split supported workflows from archived material`
+- `test(dashboard): cover queue persistence after restart`
+
+## Expectations
+- Keep comments targeted and explain only non-obvious logic.
+- Update docs when behavior or setup changes.
+- Do not add new behavior to deprecated or archived surfaces.
+- Keep public-facing examples aligned with real supported workflows.

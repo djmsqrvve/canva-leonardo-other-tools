@@ -1,5 +1,6 @@
 import argparse
 import os
+from importlib import import_module
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -8,8 +9,7 @@ from dotenv import load_dotenv
 
 from apis.canva_api import CanvaClient
 from apis.leonardo_api import LeonardoClient
-from lib.errors import ApiResponseError
-from lib.leonardo_browser import LeonardoBrowser
+from lib.errors import ApiResponseError, OptionalDependencyError
 from lib.pipeline import (
     append_ledger_event,
     build_ledger_event,
@@ -87,10 +87,24 @@ def url_extension(url: str, fallback: str = ".png") -> str:
     return extension if extension else fallback
 
 
+def create_leonardo_browser(*, headless: bool):
+    try:
+        browser_module = import_module("lib.leonardo_browser")
+    except ModuleNotFoundError as exc:
+        if exc.name in {"selenium", "webdriver_manager"}:
+            raise OptionalDependencyError(
+                "Browser generation requires optional dependencies. "
+                "Install dj_msqrvve_brand_system/requirements-browser.txt "
+                "and then rerun the command."
+            ) from exc
+        raise
+    return browser_module.LeonardoBrowser(headless=headless)
+
+
 def run_generate_browser(args: argparse.Namespace, config: dict) -> int:
     prompt = config.get("prompts", {}).get(args.prompt_key, {}).get("prompt", args.prompt_key)
     print("--- Starting Browser Automation Pipeline ---")
-    browser = LeonardoBrowser(headless=args.headless)
+    browser = create_leonardo_browser(headless=args.headless)
     try:
         browser.login()
         image_urls = browser.generate(prompt)

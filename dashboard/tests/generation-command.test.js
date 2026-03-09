@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildGenerationCommand } from '../src/lib/generation-command.js';
+import { buildGenerationCommand, resolvePythonPath } from '../src/lib/generation-command.js';
 
 test('buildGenerationCommand uses browser args without shell interpolation', () => {
   const command = buildGenerationCommand({
@@ -9,6 +9,8 @@ test('buildGenerationCommand uses browser args without shell interpolation', () 
     assetType: 'social_banner_bg',
     prompt: 'hello"; rm -rf / #',
     useBrowser: true,
+  }, {
+    existsSync: () => true,
   });
 
   assert.equal(command.pythonPath, '/repo/dj_msqrvve_brand_system/venv/bin/python');
@@ -26,6 +28,8 @@ test('buildGenerationCommand routes api mode by asset type', () => {
     assetType: 'social_banner_bg',
     prompt: 'ignored in api mode',
     useBrowser: false,
+  }, {
+    existsSync: () => true,
   });
 
   assert.deepEqual(command.args, [
@@ -43,6 +47,8 @@ test('buildGenerationCommand includes --run-id when provided in api mode', () =>
     prompt: 'ignored in api mode',
     useBrowser: false,
     runId: 'run123abc',
+  }, {
+    existsSync: () => true,
   });
 
   assert.deepEqual(command.args, [
@@ -52,4 +58,9 @@ test('buildGenerationCommand includes --run-id when provided in api mode', () =>
     '--run-id',
     'run123abc',
   ]);
+});
+
+test('resolvePythonPath falls back to python3 when repo venv is absent', () => {
+  const pythonPath = resolvePythonPath('/repo/dj_msqrvve_brand_system', () => false);
+  assert.equal(pythonPath, 'python3');
 });

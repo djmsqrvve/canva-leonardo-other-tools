@@ -5,7 +5,7 @@ CLI_PYTHON := $(if $(wildcard ./dj_msqrvve_brand_system/venv/bin/python),./venv/
 CLI_DIR := ./dj_msqrvve_brand_system
 DASHBOARD_DIR := ./dashboard
 
-.PHONY: status cli-help test test-verbose dashboard-lint health full-check
+.PHONY: status cli-help test test-verbose dashboard-lint dashboard-test dashboard-build health full-check
 
 status:
 	git status --short --branch
@@ -26,8 +26,22 @@ dashboard-lint:
 	fi
 	cd $(DASHBOARD_DIR) && npm run lint
 
+dashboard-test:
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "npm is required for dashboard tests (install Node.js 18+)."; \
+		exit 1; \
+	fi
+	cd $(DASHBOARD_DIR) && npm run test
+
+dashboard-build:
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "npm is required for dashboard build (install Node.js 18+)."; \
+		exit 1; \
+	fi
+	cd $(DASHBOARD_DIR) && npm run build
+
 health: status cli-help test
 	@echo "Health checks passed."
 
-full-check: health dashboard-lint
+full-check: health dashboard-lint dashboard-test dashboard-build
 	@echo "Full checks passed."
