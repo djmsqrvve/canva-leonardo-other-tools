@@ -59,7 +59,7 @@ npm install
 npm run dev
 ```
 
-The dashboard runs at `http://localhost:6767`.
+The dashboard binds to `127.0.0.1:6767`. Supported dashboard execution goes through the queue-backed `/api/jobs` routes only.
 
 ## Workflow Matrix
 | Workflow | Requirements | Notes |
@@ -102,6 +102,7 @@ If the dashboard restarts, queued jobs are restored and previously running jobs 
 
 ## Known Limitations
 - The dashboard queue is intentionally local-first and single-process; it is not a distributed worker system.
+- The dashboard API is intentionally localhost-only and binds to `127.0.0.1` by default.
 - Browser automation depends on Leonardo UI selectors and a locally bootstrapped Chrome profile.
 - Ledger history reflects API runs; browser jobs remain queue-tracked but do not write the API ledger.
 

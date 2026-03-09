@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getJobRuntime } from "@/lib/job-runtime";
 import { handleGetJob } from "@/lib/jobs-api-handler";
+import { guardLocalRequest } from "@/lib/localhost-request";
 
 function resolveRuntime() {
   const rootDir = path.resolve(process.cwd(), "..");
@@ -10,9 +11,14 @@ function resolveRuntime() {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ jobId: string }> },
 ) {
+  const blocked = guardLocalRequest(req);
+  if (blocked) {
+    return NextResponse.json(blocked.body, { status: blocked.status });
+  }
+
   const { jobId } = await params;
   const response = handleGetJob({
     jobId,

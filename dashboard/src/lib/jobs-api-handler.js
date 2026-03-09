@@ -1,4 +1,4 @@
-import { getErrorMessage, validateGeneratePayload } from "./generate-api-handler.js";
+import { getErrorMessage, validateGeneratePayload } from "./generation-helpers.js";
 import { readLedgerHistory } from "./ledger-history.js";
 
 function mapTransitionError(error) {

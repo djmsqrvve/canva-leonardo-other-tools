@@ -17,6 +17,8 @@ Canva API modules share one token manager. If `CANVA_REFRESH_TOKEN`, `CANVA_CLIE
 ## Dashboard Flow
 The dashboard submits jobs to Next.js route handlers, which spawn the Python CLI. Jobs are persisted to `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`.
 
+Supported execution is queue-based through `/api/jobs` and related job-control routes. The dashboard API is localhost-only and is intended to be reached from `127.0.0.1` or `localhost` on the same machine.
+
 Persistence rules:
 - queued jobs survive a server restart
 - running jobs are marked failed on restart with a recovery message

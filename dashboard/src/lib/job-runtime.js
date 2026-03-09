@@ -3,7 +3,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
 
-import { extractUrls, getErrorMessage } from "./generate-api-handler.js";
+import { extractUrls, getErrorMessage } from "./generation-helpers.js";
 import { buildGenerationCommand } from "./generation-command.js";
 
 const TERMINAL_STATUSES = new Set(["success", "failed", "canceled"]);

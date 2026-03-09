@@ -44,6 +44,11 @@ make full-check
 
 These commands are the supported validation contract for local work and CI.
 
+## Dashboard Runtime
+- `npm run dev` and `npm start` in `dashboard/` bind to `127.0.0.1:6767`.
+- Supported dashboard execution uses the queue-backed `/api/jobs` routes; the legacy direct execution route is not part of the supported surface.
+- Dashboard API requests are rejected when the request host, origin, or forwarded client address is not loopback-local.
+
 ## State and Recovery
 - API run ledger: `dj_msqrvve_brand_system/outputs/ledger.jsonl`
 - Dashboard queue state: `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`
