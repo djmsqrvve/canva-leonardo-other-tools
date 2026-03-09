@@ -45,6 +45,13 @@ python src/auth_server.py
 
 The auth helper saves `CANVA_ACCESS_TOKEN` and, when Canva returns one, `CANVA_REFRESH_TOKEN`.
 
+If you plan to use Canva autofill or export, keep tenant-specific template IDs in a local override file:
+```bash
+cp config/prompts.local.example.yaml config/prompts.local.yaml
+```
+
+`config/prompts.local.yaml` is gitignored. Public `config/prompts.yaml` intentionally keeps placeholder `canva_templates` values.
+
 ### 4. Validate the repo
 ```bash
 cd ..
@@ -66,7 +73,7 @@ The dashboard binds to `127.0.0.1:6767`. Supported dashboard execution goes thro
 | --- | --- | --- |
 | `generate-api` | `LEONARDO_API_KEY` | Stable production path |
 | `generate-api --sync` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config | Uploads raw output to Canva |
-| `generate-api --autofill --export` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config, real `canva_templates` IDs | Template IDs are tenant-specific and placeholders are rejected |
+| `generate-api --autofill --export` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config, private `canva_templates` IDs in `config/prompts.local.yaml` | Public placeholder mappings are rejected |
 | `generate-browser` | `requirements-browser.txt`, local Chrome/Chromium | First login must be interactive |
 | Dashboard browser jobs | Bootstrapped `user_profile/` | Dashboard browser jobs run headless and fail fast until the profile is seeded |
 
@@ -79,7 +86,7 @@ python src/main.py generate-api social_banner_bg --sync --canva-folder "Shadowpu
 python src/main.py generate-browser "Twilight shadowpunk skyline with negative space"
 ```
 
-Requires real Canva template IDs in `config/prompts.yaml`:
+Requires private Canva template IDs in `config/prompts.local.yaml`:
 ```bash
 python src/main.py generate-api madness_launch_key_art --autofill --export png
 ```

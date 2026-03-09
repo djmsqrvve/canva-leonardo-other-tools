@@ -70,6 +70,57 @@ def test_create_leonardo_browser_surfaces_optional_dependency_error(monkeypatch)
         main_module.create_leonardo_browser(headless=True)
 
 
+def test_load_prompts_merges_local_template_overrides(monkeypatch, tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "prompts.yaml").write_text(
+        (
+            "models: {}\n"
+            "prompts: {}\n"
+            "canva_templates:\n"
+            "  social_banner_bg: TEMPLATE_ID_HERE\n"
+            "  bevy_skybox: base_template_123\n"
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "prompts.local.yaml").write_text(
+        "canva_templates:\n  social_banner_bg: private_template_456\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(main_module, "PROJECT_ROOT", tmp_path)
+
+    config = main_module.load_prompts()
+
+    assert config["canva_templates"]["social_banner_bg"] == "private_template_456"
+    assert config["canva_templates"]["bevy_skybox"] == "base_template_123"
+
+
+def test_load_prompts_rejects_invalid_local_template_override(monkeypatch, tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "prompts.yaml").write_text("models: {}\nprompts: {}\n", encoding="utf-8")
+    (config_dir / "prompts.local.yaml").write_text("canva_templates: []\n", encoding="utf-8")
+
+    monkeypatch.setattr(main_module, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(main_module.ConfigurationError, match="must define canva_templates as a mapping"):
+        main_module.load_prompts()
+
+
+def test_resolve_canva_template_id_rejects_missing_mapping():
+    with pytest.raises(main_module.ConfigurationError, match="No Canva template ID configured"):
+        main_module.resolve_canva_template_id({"canva_templates": {}}, "social_banner_bg")
+
+
+def test_resolve_canva_template_id_rejects_placeholder_mapping():
+    with pytest.raises(main_module.ConfigurationError, match="prompts.local.yaml"):
+        main_module.resolve_canva_template_id(
+            {"canva_templates": {"social_banner_bg": "TEMPLATE_ID_HERE"}},
+            "social_banner_bg",
+        )
+
+
 def test_generate_api_sync_uploads_and_writes_ledger(monkeypatch, tmp_path):
     leo_instances = []
     canva_instances = []

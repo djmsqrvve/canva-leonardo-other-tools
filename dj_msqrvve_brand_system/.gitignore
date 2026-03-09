@@ -1,6 +1,7 @@
 # Environments
 venv/
 .env
+config/*.local.yaml
 __pycache__/
 *.pyc
 

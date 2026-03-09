@@ -14,6 +14,8 @@ The API path writes a JSONL ledger under `outputs/ledger.jsonl`. Ledger entries 
 
 Canva API modules share one token manager. If `CANVA_REFRESH_TOKEN`, `CANVA_CLIENT_ID`, and `CANVA_CLIENT_SECRET` are configured, expired Canva access tokens are refreshed in-process and retried once.
 
+Public `config/prompts.yaml` is the sample baseline. Tenant-specific Canva template IDs are intended to live in the gitignored `config/prompts.local.yaml`, which overrides `canva_templates` locally at runtime.
+
 ## Dashboard Flow
 The dashboard submits jobs to Next.js route handlers, which spawn the Python CLI. Jobs are persisted to `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`.
 

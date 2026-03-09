@@ -1,0 +1,7 @@
+# Private local Canva template overrides.
+# Copy to config/prompts.local.yaml and replace the sample values below.
+# This file is merged over config/prompts.yaml at runtime and is gitignored.
+
+canva_templates:
+  madness_launch_key_art: "your-private-template-id"
+  madness_countdown_story: "your-private-template-id"

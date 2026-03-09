@@ -24,6 +24,21 @@ Notes:
 - Refreshed access tokens are written back to `dj_msqrvve_brand_system/.env` when that file exists locally.
 - If Canva rotates the refresh token, the new `CANVA_REFRESH_TOKEN` is persisted. If Canva omits a new refresh token, the existing one is kept.
 
+## Canva Template Overrides
+Autofill and export remain tenant-specific. Keep real Canva template IDs out of the public sample config.
+
+Operator setup:
+```bash
+cd dj_msqrvve_brand_system
+cp config/prompts.local.example.yaml config/prompts.local.yaml
+```
+
+Notes:
+- `config/prompts.yaml` is the public sample config and intentionally keeps `TEMPLATE_ID_HERE` placeholders.
+- `config/prompts.local.yaml` is gitignored and only supports `canva_templates` overrides.
+- The CLI merges `config/prompts.local.yaml` over the public sample at runtime.
+- `--autofill` and `--export` fail fast when a template mapping is missing, blank, or still set to `TEMPLATE_ID_HERE`.
+
 ## Browser Automation Bootstrap
 Dashboard browser jobs run headless and expect an existing logged-in Chrome profile.
 
@@ -60,4 +75,4 @@ Recovery behavior:
 ## Limits
 - Browser jobs do not currently write ledger history.
 - The dashboard queue is single-process and local-first.
-- Canva autofill/export remains tenant-specific until real template IDs replace `TEMPLATE_ID_HERE` in `config/prompts.yaml`.
+- Canva autofill/export remains tenant-specific until real template IDs are added to `config/prompts.local.yaml`.

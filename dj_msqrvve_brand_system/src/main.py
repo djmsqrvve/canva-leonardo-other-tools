@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from apis.canva_api import CanvaClient
 from apis.leonardo_api import LeonardoClient
-from lib.errors import ApiResponseError, OptionalDependencyError
+from lib.errors import ApiResponseError, ConfigurationError, OptionalDependencyError
 from lib.pipeline import (
     append_ledger_event,
     build_ledger_event,
@@ -25,6 +25,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "outputs"
 DEFAULT_CANVA_FOLDER = "Shadowpunk/Generations"
 EXPORT_FORMATS = ("png", "jpg", "pdf", "mp4")
+PROMPTS_CONFIG_PATH = Path("config/prompts.yaml")
+PROMPTS_LOCAL_OVERRIDE_PATH = Path("config/prompts.local.yaml")
+PROMPTS_LOCAL_EXAMPLE_PATH = Path("config/prompts.local.example.yaml")
+PLACEHOLDER_CANVA_TEMPLATE_ID = "TEMPLATE_ID_HERE"
 
 
 def load_environment() -> None:
@@ -32,10 +36,90 @@ def load_environment() -> None:
     load_dotenv(env_path)
 
 
+def load_yaml_mapping(path: Path, *, label: str) -> dict:
+    with path.open("r", encoding="utf-8") as file_obj:
+        payload = yaml.safe_load(file_obj)
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ConfigurationError(f"{label} must contain a top-level mapping.")
+    return payload
+
+
+def normalize_canva_templates(raw_templates: object, *, source: str) -> dict[str, str]:
+    if raw_templates is None:
+        return {}
+    if not isinstance(raw_templates, dict):
+        raise ConfigurationError(f"{source} must define canva_templates as a mapping.")
+
+    normalized: dict[str, str] = {}
+    for asset_key, template_id in raw_templates.items():
+        if not isinstance(asset_key, str) or not asset_key.strip():
+            raise ConfigurationError(f"{source} contains an empty canva_templates key.")
+        if not isinstance(template_id, str):
+            raise ConfigurationError(
+                f"{source} contains a non-string canva_templates value for '{asset_key}'."
+            )
+
+        cleaned_template_id = template_id.strip()
+        if not cleaned_template_id:
+            raise ConfigurationError(
+                f"{source} contains an empty Canva template ID for '{asset_key}'."
+            )
+        normalized[asset_key.strip()] = cleaned_template_id
+    return normalized
+
+
 def load_prompts() -> dict:
-    config_path = PROJECT_ROOT / "config" / "prompts.yaml"
-    with config_path.open("r", encoding="utf-8") as file_obj:
-        return yaml.safe_load(file_obj)
+    config_path = PROJECT_ROOT / PROMPTS_CONFIG_PATH
+    config = load_yaml_mapping(config_path, label=str(PROMPTS_CONFIG_PATH))
+    config["canva_templates"] = normalize_canva_templates(
+        config.get("canva_templates"),
+        source=str(PROMPTS_CONFIG_PATH),
+    )
+
+    override_path = PROJECT_ROOT / PROMPTS_LOCAL_OVERRIDE_PATH
+    if not override_path.exists():
+        return config
+
+    overrides = load_yaml_mapping(override_path, label=str(PROMPTS_LOCAL_OVERRIDE_PATH))
+    unexpected_keys = set(overrides) - {"canva_templates"}
+    if unexpected_keys:
+        unexpected = ", ".join(sorted(unexpected_keys))
+        raise ConfigurationError(
+            f"{PROMPTS_LOCAL_OVERRIDE_PATH} only supports canva_templates overrides; found: {unexpected}."
+        )
+
+    override_templates = normalize_canva_templates(
+        overrides.get("canva_templates"),
+        source=str(PROMPTS_LOCAL_OVERRIDE_PATH),
+    )
+    if override_templates:
+        config["canva_templates"] = {
+            **config.get("canva_templates", {}),
+            **override_templates,
+        }
+    return config
+
+
+def resolve_canva_template_id(config: dict, asset_key: str) -> str:
+    template_id = normalize_canva_templates(
+        config.get("canva_templates"),
+        source="effective config",
+    ).get(asset_key)
+    if not template_id:
+        raise ConfigurationError(
+            f"No Canva template ID configured for '{asset_key}'. "
+            f"Add it to {PROMPTS_LOCAL_OVERRIDE_PATH} "
+            f"(copy {PROMPTS_LOCAL_EXAMPLE_PATH}) before using --autofill or --export."
+        )
+    if template_id == PLACEHOLDER_CANVA_TEMPLATE_ID:
+        raise ConfigurationError(
+            f"Placeholder Canva template ID configured for '{asset_key}'. "
+            f"Set a real private ID in {PROMPTS_LOCAL_OVERRIDE_PATH} "
+            f"(copy {PROMPTS_LOCAL_EXAMPLE_PATH}) before using --autofill or --export."
+        )
+    return template_id
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -244,9 +328,7 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
 
     design_id = None
     if args.autofill:
-        template_id = config.get("canva_templates", {}).get(asset_key)
-        if not template_id or template_id == "TEMPLATE_ID_HERE":
-            raise ValueError(f"No valid canva_templates mapping found for '{asset_key}'")
+        template_id = resolve_canva_template_id(config, asset_key)
 
         autofill_entry = find_stage_success(ledger_path, idempotency_key, "autofill")
         design_id = autofill_entry.get("design_id") if autofill_entry else None
