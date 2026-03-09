@@ -1,31 +1,32 @@
 import { create } from 'zustand';
 
-interface Generation {
-  id: string;
-  type: string;
-  prompt: string;
-  urls: string[];
-  status: 'pending' | 'completed' | 'failed';
-  timestamp: number;
-}
+import type { DashboardJob, LedgerRunSummary } from '@/lib/job-types';
 
 interface BrandStore {
-  generations: Generation[];
-  isGenerating: boolean;
-  addGeneration: (gen: Generation) => void;
-  updateGeneration: (id: string, updates: Partial<Generation>) => void;
-  setGenerating: (val: boolean) => void;
+  jobs: DashboardJob[];
+  history: LedgerRunSummary[];
+  activeJobId: string | null;
+  isPolling: boolean;
+  setJobs: (jobs: DashboardJob[]) => void;
+  upsertJob: (job: DashboardJob) => void;
+  setHistory: (runs: LedgerRunSummary[]) => void;
+  setActiveJobId: (jobId: string | null) => void;
+  setPolling: (value: boolean) => void;
 }
 
 export const useBrandStore = create<BrandStore>((set) => ({
-  generations: [],
-  isGenerating: false,
-  addGeneration: (gen) => set((state) => ({ generations: [gen, ...state.generations] })),
-  updateGeneration: (id, updates) =>
+  jobs: [],
+  history: [],
+  activeJobId: null,
+  isPolling: false,
+  setJobs: (jobs) => set({ jobs }),
+  upsertJob: (job) =>
     set((state) => ({
-      generations: state.generations.map((gen) =>
-        gen.id === id ? { ...gen, ...updates } : gen
-      ),
+      jobs: state.jobs.some((existing) => existing.id === job.id)
+        ? state.jobs.map((existing) => (existing.id === job.id ? job : existing))
+        : [job, ...state.jobs],
     })),
-  setGenerating: (val) => set({ isGenerating: val }),
+  setHistory: (runs) => set({ history: runs }),
+  setActiveJobId: (jobId) => set({ activeJobId: jobId }),
+  setPolling: (value) => set({ isPolling: value }),
 }));

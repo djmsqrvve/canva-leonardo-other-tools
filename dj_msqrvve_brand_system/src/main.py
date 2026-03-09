@@ -146,21 +146,24 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
 
     if not image_url:
         log_event("generation", "started")
-        leo_client = LeonardoClient()
-        generation_result = leo_client.generate_and_wait(
-            prompt=prompt_data["prompt"],
-            model_id=model_id,
-            width=prompt_data.get("width", 1024),
-            height=prompt_data.get("height", 1024),
-            alchemy=prompt_data.get("alchemy", True),
-            return_metadata=True,
-        )
-        image_urls = generation_result.get("urls", [])
-        if not image_urls:
-            log_event("generation", "failed", error="Leonardo returned no image URLs")
-            raise ApiResponseError("Leonardo generation returned no image URLs")
-        image_url = image_urls[0]
-        generation_id = generation_result.get("generation_id")
+        try:
+            leo_client = LeonardoClient()
+            generation_result = leo_client.generate_and_wait(
+                prompt=prompt_data["prompt"],
+                model_id=model_id,
+                width=prompt_data.get("width", 1024),
+                height=prompt_data.get("height", 1024),
+                alchemy=prompt_data.get("alchemy", True),
+                return_metadata=True,
+            )
+            image_urls = generation_result.get("urls", [])
+            if not image_urls:
+                raise ApiResponseError("Leonardo generation returned no image URLs")
+            image_url = image_urls[0]
+            generation_id = generation_result.get("generation_id")
+        except Exception as exc:
+            log_event("generation", "failed", error=str(exc))
+            raise
         log_event(
             "generation",
             "success",
@@ -176,7 +179,17 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
         extension = url_extension(image_url)
         raw_path = output_dirs["raw"] / f"{asset_key}{extension}"
         log_event("download_raw", "started", image_url=image_url, local_path=str(raw_path))
-        download_to_file(image_url, str(raw_path))
+        try:
+            download_to_file(image_url, str(raw_path))
+        except Exception as exc:
+            log_event(
+                "download_raw",
+                "failed",
+                image_url=image_url,
+                local_path=str(raw_path),
+                error=str(exc),
+            )
+            raise
         log_event("download_raw", "success", image_url=image_url, local_path=str(raw_path))
 
     canva_client = None
@@ -188,13 +201,22 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
         if not canva_asset_id:
             canva_client = CanvaClient()
             log_event("sync", "started", local_path=str(raw_path))
-            folder_id = canva_client.get_or_create_shadowpunk_folder(args.canva_folder)
-            upload_result = canva_client.upload_asset(
-                str(raw_path),
-                folder_id=folder_id,
-                folder_path=args.canva_folder,
-            )
-            canva_asset_id = upload_result["asset_id"]
+            try:
+                folder_id = canva_client.get_or_create_shadowpunk_folder(args.canva_folder)
+                upload_result = canva_client.upload_asset(
+                    str(raw_path),
+                    folder_id=folder_id,
+                    folder_path=args.canva_folder,
+                )
+                canva_asset_id = upload_result["asset_id"]
+            except Exception as exc:
+                log_event(
+                    "sync",
+                    "failed",
+                    local_path=str(raw_path),
+                    error=str(exc),
+                )
+                raise
             log_event(
                 "sync",
                 "success",
@@ -219,15 +241,18 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
             if canva_client is None:
                 canva_client = CanvaClient()
             log_event("autofill", "started", image_url=image_url)
-            autofill_job_id = canva_client.autofill_template(
-                template_id,
-                {"Background": image_url},
-            )
-            wait_result = canva_client.wait_for_autofill_job(autofill_job_id)
-            design_id = wait_result.get("design_id")
-            if not design_id:
-                log_event("autofill", "failed", error="Autofill completed without design ID")
-                raise ApiResponseError("Autofill completed without a design ID")
+            try:
+                autofill_job_id = canva_client.autofill_template(
+                    template_id,
+                    {"Background": image_url},
+                )
+                wait_result = canva_client.wait_for_autofill_job(autofill_job_id)
+                design_id = wait_result.get("design_id")
+                if not design_id:
+                    raise ApiResponseError("Autofill completed without a design ID")
+            except Exception as exc:
+                log_event("autofill", "failed", image_url=image_url, error=str(exc))
+                raise
             log_event(
                 "autofill",
                 "success",
@@ -239,21 +264,26 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
     if args.export_format:
         export_entry = find_stage_success(ledger_path, idempotency_key, "export")
         export_path = export_entry.get("export_path") if export_entry else None
+        if export_path and not Path(export_path).exists():
+            export_path = None
 
         if not export_path:
             if canva_client is None:
                 canva_client = CanvaClient()
             log_event("export", "started", design_id=design_id)
-            export_job_id = canva_client.export_design(design_id, args.export_format)
-            wait_result = canva_client.wait_for_export_job(export_job_id)
-            urls = wait_result.get("download_urls", [])
-            if not urls:
-                log_event("export", "failed", design_id=design_id, error="No export download URL returned")
-                raise ApiResponseError("Export completed without download URLs")
+            try:
+                export_job_id = canva_client.export_design(design_id, args.export_format)
+                wait_result = canva_client.wait_for_export_job(export_job_id)
+                urls = wait_result.get("download_urls", [])
+                if not urls:
+                    raise ApiResponseError("Export completed without download URLs")
 
-            resolved_export_path = output_dirs["exports"] / f"{asset_key}_{run_id}.{args.export_format}"
-            download_to_file(urls[0], str(resolved_export_path))
-            export_path = str(resolved_export_path)
+                resolved_export_path = output_dirs["exports"] / f"{asset_key}_{run_id}.{args.export_format}"
+                download_to_file(urls[0], str(resolved_export_path))
+                export_path = str(resolved_export_path)
+            except Exception as exc:
+                log_event("export", "failed", design_id=design_id, error=str(exc))
+                raise
             log_event(
                 "export",
                 "success",

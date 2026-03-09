@@ -2,6 +2,7 @@ import os
 import pytest
 import responses
 from apis.canva_api import CanvaClient
+from lib.errors import ApiResponseError
 from responses.matchers import query_param_matcher
 
 @pytest.fixture
@@ -131,3 +132,112 @@ def test_upload_asset_happy_path(mock_env, tmp_path, monkeypatch):
     result = client.upload_asset(str(file_path), folder_id="folder_generations")
     assert result["asset_id"] == "asset_123"
     assert result["job_id"] == "upload_job_1"
+
+
+def test_autofill_template_missing_job_id_raises(mock_env, monkeypatch):
+    client = CanvaClient()
+
+    class StubAutofill:
+        @staticmethod
+        def start_autofill_job(_template_id, _data):
+            return {"job": {}}
+
+    monkeypatch.setattr(client, "autofill", StubAutofill())
+
+    with pytest.raises(ApiResponseError, match="autofill did not return a job ID"):
+        client.autofill_template("template_123", {"Title": "Hello"})
+
+
+def test_export_design_missing_job_id_raises(mock_env, monkeypatch):
+    client = CanvaClient()
+
+    class StubExports:
+        @staticmethod
+        def start_export_job(_design_id, _format_type):
+            return {"job": {}}
+
+    monkeypatch.setattr(client, "exports", StubExports())
+
+    with pytest.raises(ApiResponseError, match="export did not return a job ID"):
+        client.export_design("design_123", "png")
+
+
+@responses.activate
+def test_upload_asset_missing_job_id_raises(mock_env, tmp_path):
+    client = CanvaClient()
+    file_path = tmp_path / "asset.png"
+    file_path.write_bytes(b"test-bytes")
+
+    responses.add(
+        responses.POST,
+        f"{client.BASE_URL}/asset-uploads",
+        json={"upload_url": "https://upload.test/signed-url"},
+        status=200,
+    )
+
+    with pytest.raises(ApiResponseError, match="did not return a job ID"):
+        client.upload_asset(str(file_path), folder_id="folder_generations")
+
+
+@responses.activate
+def test_upload_asset_signed_upload_failure_raises(mock_env, tmp_path, monkeypatch):
+    client = CanvaClient()
+    file_path = tmp_path / "asset.png"
+    file_path.write_bytes(b"test-bytes")
+
+    responses.add(
+        responses.POST,
+        f"{client.BASE_URL}/asset-uploads",
+        json={
+            "job": {"id": "upload_job_1"},
+            "upload_url": "https://upload.test/signed-url",
+        },
+        status=200,
+    )
+
+    class DummyResponse:
+        status_code = 500
+        text = "upload failed"
+
+    def fake_put(url, data, headers, timeout):
+        return DummyResponse()
+
+    monkeypatch.setattr("apis.canva.assets.requests.put", fake_put)
+
+    with pytest.raises(ApiResponseError, match="Signed upload failed"):
+        client.upload_asset(str(file_path), folder_id="folder_generations")
+
+
+@responses.activate
+def test_upload_asset_terminal_failed_status_raises(mock_env, tmp_path, monkeypatch):
+    client = CanvaClient()
+    file_path = tmp_path / "asset.png"
+    file_path.write_bytes(b"test-bytes")
+
+    responses.add(
+        responses.POST,
+        f"{client.BASE_URL}/asset-uploads",
+        json={
+            "job": {"id": "upload_job_1"},
+            "upload_url": "https://upload.test/signed-url",
+        },
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        f"{client.BASE_URL}/asset-uploads/upload_job_1",
+        json={"job": {"status": "FAILED"}},
+        status=200,
+    )
+
+    class DummyResponse:
+        status_code = 200
+        text = ""
+
+    def fake_put(url, data, headers, timeout):
+        return DummyResponse()
+
+    monkeypatch.setattr("apis.canva.assets.requests.put", fake_put)
+
+    with pytest.raises(ApiResponseError, match="failed with status"):
+        client.upload_asset(str(file_path), folder_id="folder_generations")

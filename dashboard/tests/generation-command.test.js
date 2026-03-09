@@ -35,3 +35,21 @@ test('buildGenerationCommand routes api mode by asset type', () => {
   ]);
   assert.ok(command.env.PYTHONPATH.includes('/repo/dj_msqrvve_brand_system/src'));
 });
+
+test('buildGenerationCommand includes --run-id when provided in api mode', () => {
+  const command = buildGenerationCommand({
+    rootDir: '/repo',
+    assetType: 'social_banner_bg',
+    prompt: 'ignored in api mode',
+    useBrowser: false,
+    runId: 'run123abc',
+  });
+
+  assert.deepEqual(command.args, [
+    '/repo/dj_msqrvve_brand_system/src/main.py',
+    'generate-api',
+    'social_banner_bg',
+    '--run-id',
+    'run123abc',
+  ]);
+});

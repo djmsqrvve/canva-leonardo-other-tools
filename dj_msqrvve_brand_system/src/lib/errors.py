@@ -53,4 +53,4 @@ def handle_request_exception(exc: Exception, context: str) -> None:
         raise TimeoutError(f"Request timed out during {context}") from exc
     if isinstance(exc, requests.RequestException):
         raise ApiResponseError(f"Request failed during {context}: {exc}") from exc
-    raise
+    raise exc

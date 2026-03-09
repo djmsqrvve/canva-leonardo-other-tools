@@ -9,15 +9,16 @@ This plan upgrades the full `canva_leonardo_other_tools` stack:
 3. `stream_ops` integration surfaces
 4. Test, release, and operational docs
 
-## Current Gaps (March 8, 2026)
+## Current Status (March 9, 2026)
 
-1. `AssetsClient.upload_asset()` is still a placeholder (`pass`) in `src/apis/canva/assets.py`.
-2. No shared polling/retry utility for async Canva/Leonardo jobs.
-3. `src/main.py` supports generation but not end-to-end sync/autofill/export orchestration.
-4. `src/cli.py` is scaffold/mocked and not aligned with production command surface.
-5. Dashboard API route shells out using interpolated strings and has no job queue/status model.
-6. Limited test coverage for production paths (upload, autofill polling, export download).
-7. No central artifact ledger for traceability from prompt -> asset -> Canva design -> export file.
+1. P0 core pipeline is implemented:
+- real Canva upload + folder path resolution
+- shared polling/retry helpers
+- orchestration flags in `src/main.py` (`--sync`, `--autofill`, `--export`, `--canva-folder`, `--run-id`)
+- JSONL ledger + idempotency key strategy
+2. Legacy `src/cli.py` remains deprecated/scaffolded and should not receive new behavior.
+3. Dashboard route execution has been hardened with `spawn`, but queue/status/history controls are still pending.
+4. Remaining risk is now mostly test depth, operational polish, and dashboard control-plane features.
 
 ## Target End State
 
@@ -27,17 +28,15 @@ This plan upgrades the full `canva_leonardo_other_tools` stack:
 4. Dashboard with async job status, history, and retry controls.
 5. Production-grade security and QA gates.
 
-## Timeline (Proposed)
+## Timeline (Updated)
 
-1. Phase 0: March 8-9, 2026
-2. Phase 1: March 9-11, 2026
-3. Phase 2: March 11-13, 2026
-4. Phase 3: March 13-15, 2026
-5. Phase 4: March 15-18, 2026
-6. Phase 5: March 18-20, 2026
-7. Phase 6: March 20-21, 2026
+1. Phase 0-2: Completed on `feature/p0-core-pipeline` (through March 9, 2026)
+2. Phase 3: In progress (autofill/export hardening + validation)
+3. Phase 4: Next (dashboard queue/status/history)
+4. Phase 5: Parallel with Phase 3-4 (QA/security/reliability expansion)
+5. Phase 6: Release/handoff after Phase 4 and QA exit criteria are met
 
-## Phase 0: Baseline and Freeze
+## Phase 0: Baseline and Freeze (Completed)
 
 ### Objective
 Lock baseline behavior and create upgrade-safe guardrails.
@@ -55,7 +54,7 @@ Lock baseline behavior and create upgrade-safe guardrails.
 ### Exit Criteria
 1. Team agrees on command surface and feature priorities.
 
-## Phase 1: Core API Hardening (P0)
+## Phase 1: Core API Hardening (P0, Completed)
 
 ### Objective
 Make Canva + Leonardo API clients production-usable.
@@ -75,7 +74,7 @@ Make Canva + Leonardo API clients production-usable.
 1. Single command can upload an existing local file to a target Canva folder.
 2. Polling utility handles success, timeout, and failure states with clear logs.
 
-## Phase 2: Pipeline Orchestrator and Asset Sync (P0)
+## Phase 2: Pipeline Orchestrator and Asset Sync (P0, Completed)
 
 ### Objective
 Chain generation -> sync -> optional autofill in one reliable flow.

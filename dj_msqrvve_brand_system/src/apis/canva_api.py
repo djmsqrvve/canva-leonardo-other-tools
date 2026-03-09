@@ -5,6 +5,7 @@ from .canva.assets import AssetsClient
 from .canva.designs import DesignsClient
 from .canva.autofill import AutofillClient
 from .canva.exports import ExportsClient
+from lib.errors import ApiResponseError
 from lib.utils import extract_nested, poll_job
 
 class CanvaClient:
@@ -83,7 +84,10 @@ class CanvaClient:
         """Proxy to AutofillClient."""
         self._require_token()
         response = self.autofill.start_autofill_job(template_id, data)
-        return response.get("job", {}).get("id")
+        job_id = response.get("job", {}).get("id")
+        if not job_id:
+            raise ApiResponseError("Canva autofill did not return a job ID.")
+        return job_id
 
     def wait_for_autofill_job(self, job_id: str) -> dict[str, Any]:
         self._require_token()
@@ -105,7 +109,10 @@ class CanvaClient:
         """Proxy to ExportsClient."""
         self._require_token()
         response = self.exports.start_export_job(design_id, format_type)
-        return response.get("job", {}).get("id")
+        job_id = response.get("job", {}).get("id")
+        if not job_id:
+            raise ApiResponseError("Canva export did not return a job ID.")
+        return job_id
 
     def wait_for_export_job(self, job_id: str) -> dict[str, Any]:
         self._require_token()

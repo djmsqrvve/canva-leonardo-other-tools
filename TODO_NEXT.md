@@ -1,21 +1,31 @@
-# 📝 TODO: CLI Upgrades & Sprint 1 Execution (March 7, 2026)
+# TODO NEXT: Merge Stabilization + Post-Merge Targets (March 9, 2026)
 
-Target: Finalize the "Shadowpunk Vault" and solidify the "Down-to-the-Tee" CLI.
+Target: Merge `feature/p0-core-pipeline` safely, then start Phase 4 dashboard control-plane work.
 
-## 🛠️ High-Priority CLI Upgrades
-- [ ] **Real Asset Upload Logic:** Complete the `AssetsClient.upload_asset()` implementation in `src/apis/canva/assets.py` using the 2-step multipart upload flow.
-- [ ] **Polling Utility:** Create a reusable `poll_job(job_id, api_type)` helper in `src/lib/utils.py` to handle asynchronous Canva/Leonardo tasks uniformly.
-- [ ] **The `--sync` Flag:** Update `main.py` so that `generate-api --sync` automatically triggers the Leonardo -> Local -> Canva Upload pipeline.
-- [ ] **Folder Auto-Discovery:** Implement `get_or_create_shadowpunk_folder()` to ensure assets land in `Shadowpunk/Generations` by default.
+## Completed in P0 (Implemented on feature branch)
+- [x] Real Canva asset upload flow in `src/apis/canva/assets.py`.
+- [x] Shared polling/backoff helpers in `src/lib/utils.py`.
+- [x] Orchestrated `generate-api` contract in `src/main.py` (`--sync`, `--autofill`, `--export`, `--canva-folder`, `--run-id`).
+- [x] Ledger + idempotency helpers in `src/lib/pipeline.py`.
+- [x] Typed API errors in `src/lib/errors.py`.
+- [x] Dashboard generate route switched from shell command strings to `spawn`.
 
-## 🎨 Aesthetic & UX Refinement
-- [ ] **CLI Progress Bars:** Add `tqdm` or a custom "Bioluminescent Pulse" progress bar for long generation/upload tasks.
-- [ ] **JSON Data Logging:** Implement a local `ledger.json` to track every generation (Prompt, URL, Canva Design ID) for easier debugging and retrieval.
+## Active Priorities (Pre-Merge Stabilization)
+- [ ] Ensure dashboard lint/test/build checks are green with route and UI tests.
+- [ ] Close failure-path test gaps for generation/sync/autofill/export ledger behavior.
+- [ ] Close API error-shape tests (auth/rate-limit/timeout/request failures).
+- [ ] Confirm idempotent resume behavior and export re-download behavior in tests.
+- [ ] Keep docs and PR checklist aligned with actual commands.
 
-## 🧪 Verification
-- [ ] **End-to-End Test:** Successfully run `python src/main.py generate-api helix2000_tileset_grass --sync` and verify the image appears in the Canva "Shadowpunk" folder.
-- [ ] **Dashboard Sync:** Ensure the Next.js Dashboard gallery refreshes automatically when a new asset is synced to the vault.
+## Next Feature Targets (Post-Merge)
+- [ ] Dashboard job queue model (`queued/running/success/failed/canceled`).
+- [ ] Status endpoint + polling UI + history view sourced from ledger.
+- [ ] Retry/cancel controls for failed or stalled jobs.
+- [ ] Route parity for full CLI flags once queue/status flow is in place.
 
----
-**Current Port:** Dashboard running on http://localhost:6767
-**Active Branch:** main (all changes committed)
+## Verification Commands
+```bash
+make health
+cd dashboard && npm run lint
+cd dashboard && npm run test
+```

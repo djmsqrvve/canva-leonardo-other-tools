@@ -1,7 +1,7 @@
 import path from 'path';
 
 /**
- * @param {{ rootDir: string; assetType: string; prompt: string; useBrowser: boolean }} input
+ * @param {{ rootDir: string; assetType: string; prompt: string; useBrowser: boolean; runId?: string }} input
  */
 export function buildGenerationCommand(input) {
   const projectRoot = path.join(input.rootDir, 'dj_msqrvve_brand_system');
@@ -14,6 +14,9 @@ export function buildGenerationCommand(input) {
     args.push('generate-browser', input.prompt, '--headless');
   } else {
     args.push('generate-api', input.assetType);
+    if (input.runId) {
+      args.push('--run-id', input.runId);
+    }
   }
 
   const pyPath = process.env.PYTHONPATH

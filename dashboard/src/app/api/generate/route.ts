@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import { buildGenerationCommand } from '@/lib/generation-command';
+import { runGenerateRequest } from '@/lib/generate-api-handler';
 
 function runProcess(command: string, args: string[], env: NodeJS.ProcessEnv) {
   return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
@@ -29,43 +30,18 @@ function runProcess(command: string, args: string[], env: NodeJS.ProcessEnv) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { assetType, prompt, useBrowser } = await req.json();
-    if (useBrowser && !prompt) {
-      return NextResponse.json({ error: 'Prompt is required for browser generation.' }, { status: 400 });
-    }
-    if (!useBrowser && !assetType) {
-      return NextResponse.json({ error: 'assetType is required for API generation.' }, { status: 400 });
-    }
-
     const rootDir = path.resolve(process.cwd(), '..');
-    const command = buildGenerationCommand({
+    const payload = await req.json();
+    const response = await runGenerateRequest({
+      payload,
       rootDir,
-      assetType,
-      prompt,
-      useBrowser: Boolean(useBrowser),
+      buildGenerationCommand,
+      runProcess,
     });
-
-    const { stdout, stderr, exitCode } = await runProcess(
-      command.pythonPath,
-      command.args,
-      command.env,
-    );
-
-    if (exitCode !== 0) {
-      return NextResponse.json({ error: stderr || stdout || 'Generation failed.' }, { status: 500 });
-    }
-
-    // Parse the output for image URLs
-    const urls = stdout.match(/https?:\/\/[^\s]+/g) || [];
-
-    return NextResponse.json({ 
-        message: 'Generation completed', 
-        output: stdout,
-        urls: urls
-    });
-
-  } catch (error: any) {
+    return NextResponse.json(response.body, { status: response.status });
+  } catch (error: unknown) {
     console.error('Generation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Invalid request payload.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
