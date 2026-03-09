@@ -1,3 +1,8 @@
+"""DEPRECATED: legacy scaffold CLI kept for reference only.
+
+Do not add new behavior here. The maintained entrypoint is `src/main.py`.
+"""
+
 import argparse
 import yaml
 import os
@@ -59,6 +64,7 @@ def composite_in_canva(config, template_key, background_url):
     return "mock_canva_design_id"
 
 def main():
+    print("⚠️  Deprecated: use `python src/main.py ...` instead of `python src/cli.py ...`.")
     parser = argparse.ArgumentParser(description="DJ MSQRVVE Brand Automator")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

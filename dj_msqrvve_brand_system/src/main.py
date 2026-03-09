@@ -1,109 +1,298 @@
 import argparse
 import os
+from pathlib import Path
+from urllib.parse import urlparse
+
 import yaml
 from dotenv import load_dotenv
-from lib.leonardo_browser import LeonardoBrowser
-from apis.leonardo_api import LeonardoClient
-from apis.canva_api import CanvaClient
 
-def load_environment():
-    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+from apis.canva_api import CanvaClient
+from apis.leonardo_api import LeonardoClient
+from lib.errors import ApiResponseError
+from lib.leonardo_browser import LeonardoBrowser
+from lib.pipeline import (
+    append_ledger_event,
+    build_ledger_event,
+    ensure_output_dirs,
+    find_stage_success,
+    generate_run_id,
+    make_idempotency_key,
+)
+from lib.utils import download_to_file
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "outputs"
+DEFAULT_CANVA_FOLDER = "Shadowpunk/Generations"
+EXPORT_FORMATS = ("png", "jpg", "pdf", "mp4")
+
+
+def load_environment() -> None:
+    env_path = PROJECT_ROOT / ".env"
     load_dotenv(env_path)
 
-def load_prompts():
-    config_path = os.path.join(os.path.dirname(__file__), "..", "config", "prompts.yaml")
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
 
-def main():
-    load_environment()
-    config = load_prompts()
-    
+def load_prompts() -> dict:
+    config_path = PROJECT_ROOT / "config" / "prompts.yaml"
+    with config_path.open("r", encoding="utf-8") as file_obj:
+        return yaml.safe_load(file_obj)
+
+
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="DJ MSQRVVE Brand System CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Command: generate-browser
-    # For using the free 'Essential' plan via Canva login on the web UI
-    browser_parser = subparsers.add_parser("generate-browser", help="Generate assets via automated browser (Free tokens)")
+    browser_parser = subparsers.add_parser(
+        "generate-browser",
+        help="Generate assets via automated browser (Free tokens)",
+    )
     browser_parser.add_argument("prompt_key", help="Key from prompts.yaml or a custom prompt string")
     browser_parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
 
-    # Command: generate-api
-    # For using the Production API (Requires LEONARDO_API_KEY + Credits)
-    api_parser = subparsers.add_parser("generate-api", help="Generate assets via Production API (Requires Credits)")
-    api_parser.add_argument("asset_type", help="Asset type from prompts.yaml")
+    api_parser = subparsers.add_parser(
+        "generate-api",
+        help="Generate assets via Production API (Requires Credits)",
+    )
+    api_parser.add_argument("asset_type", help="Asset type key from prompts.yaml")
+    api_parser.add_argument("--sync", action="store_true", help="Upload generated asset to Canva")
+    api_parser.add_argument(
+        "--autofill",
+        action="store_true",
+        help="Run Canva template autofill after generation",
+    )
+    api_parser.add_argument(
+        "--export",
+        dest="export_format",
+        nargs="?",
+        choices=EXPORT_FORMATS,
+        const="png",
+        help="Export Canva design output (defaults to png when flag is present)",
+    )
+    api_parser.add_argument(
+        "--canva-folder",
+        default=DEFAULT_CANVA_FOLDER,
+        help=f"Target Canva folder path for sync (default: {DEFAULT_CANVA_FOLDER})",
+    )
+    api_parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Optional run ID for idempotent retries",
+    )
+    return parser
 
-    args = parser.parse_args()
 
-    if args.command == "generate-browser":
-        # Get the prompt from prompts.yaml or use as raw string
-        prompt = config.get("prompts", {}).get(args.prompt_key, {}).get("prompt", args.prompt_key)
-        
-        print(f"--- Starting Browser Automation Pipeline ---")
-        browser = LeonardoBrowser(headless=args.headless)
-        try:
-            browser.login()
-            image_urls = browser.generate(prompt)
-            if image_urls:
-                print(f"✅ Success! Retrieved {len(image_urls)} images:")
-                for i, url in enumerate(image_urls):
-                    print(f"   [{i}] {url}")
-            else:
-                print("❌ Generation failed or no images found.")
-        finally:
-            print("Closing browser...")
-            browser.close()
+def url_extension(url: str, fallback: str = ".png") -> str:
+    path = urlparse(url).path
+    extension = Path(path).suffix.lower()
+    return extension if extension else fallback
 
-    elif args.command == "generate-api":
-        asset_key = args.asset_type
-        prompt_data = config.get("prompts", {}).get(asset_key)
-        
-        if not prompt_data:
-            print(f"❌ Error: No prompt configuration found for '{asset_key}' in prompts.yaml")
-            return
 
-        print(f"--- Starting Production API Pipeline for: {asset_key} ---")
-        
-        # 1. Leonardo Generation
+def run_generate_browser(args: argparse.Namespace, config: dict) -> int:
+    prompt = config.get("prompts", {}).get(args.prompt_key, {}).get("prompt", args.prompt_key)
+    print("--- Starting Browser Automation Pipeline ---")
+    browser = LeonardoBrowser(headless=args.headless)
+    try:
+        browser.login()
+        image_urls = browser.generate(prompt)
+        if image_urls:
+            print(f"✅ Success! Retrieved {len(image_urls)} images:")
+            for index, url in enumerate(image_urls):
+                print(f"   [{index}] {url}")
+            return 0
+        print("❌ Generation failed or no images found.")
+        return 1
+    finally:
+        print("Closing browser...")
+        browser.close()
+
+
+def run_generate_api(args: argparse.Namespace, config: dict) -> int:
+    asset_key = args.asset_type
+    prompt_data = config.get("prompts", {}).get(asset_key)
+    if not prompt_data:
+        raise ValueError(f"No prompt configuration found for '{asset_key}' in prompts.yaml")
+
+    if args.export_format and not args.autofill:
+        raise ValueError("--export requires --autofill to produce a design to export")
+
+    run_id = args.run_id or generate_run_id()
+    output_dirs = ensure_output_dirs(str(DEFAULT_OUTPUT_ROOT), run_id)
+    ledger_path = output_dirs["ledger"]
+    idempotency_key = make_idempotency_key(run_id, asset_key, prompt_data["prompt"])
+
+    def log_event(stage: str, status: str, **kwargs):
+        event = build_ledger_event(
+            run_id=run_id,
+            asset_key=asset_key,
+            idempotency_key=idempotency_key,
+            stage=stage,
+            status=status,
+            **kwargs,
+        )
+        append_ledger_event(ledger_path, event)
+        return event
+
+    print(f"--- Starting Production API Pipeline for: {asset_key} ---")
+    print(f"Run ID: {run_id}")
+
+    model_key = prompt_data.get("model", "phoenix")
+    model_id = config.get("models", {}).get(model_key)
+    if not model_id:
+        raise ValueError(f"No model ID configured for model key '{model_key}'")
+
+    generation_entry = find_stage_success(ledger_path, idempotency_key, "generation")
+    generation_id = generation_entry.get("generation_id") if generation_entry else None
+    image_url = generation_entry.get("image_url") if generation_entry else None
+
+    if not image_url:
+        log_event("generation", "started")
         leo_client = LeonardoClient()
-        model_key = prompt_data.get("model", "phoenix")
-        model_id = config.get("models", {}).get(model_key)
-        
-        print(f"🚀 Triggering Leonardo generation (Model: {model_key})...")
-        image_urls = leo_client.generate_and_wait(
+        generation_result = leo_client.generate_and_wait(
             prompt=prompt_data["prompt"],
             model_id=model_id,
             width=prompt_data.get("width", 1024),
             height=prompt_data.get("height", 1024),
-            alchemy=prompt_data.get("alchemy", True)
+            alchemy=prompt_data.get("alchemy", True),
+            return_metadata=True,
         )
-        
+        image_urls = generation_result.get("urls", [])
         if not image_urls:
-            print("❌ Leonardo generation failed to return image URLs.")
-            return
-
+            log_event("generation", "failed", error="Leonardo returned no image URLs")
+            raise ApiResponseError("Leonardo generation returned no image URLs")
         image_url = image_urls[0]
-        print(f"✅ Leonardo Art Generated: {image_url}")
+        generation_id = generation_result.get("generation_id")
+        log_event(
+            "generation",
+            "success",
+            generation_id=generation_id,
+            image_url=image_url,
+            extras={"image_urls": image_urls},
+        )
 
-        # 2. Check for Canva Integration
-        # Look for a matching template in canva_templates config
-        template_id = config.get("canva_templates", {}).get(asset_key)
-        
-        if template_id and template_id != "TEMPLATE_ID_HERE":
-            print(f"🎨 Detected Canva Integration Workflow (Template: {template_id})")
+    raw_entry = find_stage_success(ledger_path, idempotency_key, "download_raw")
+    raw_path = Path(raw_entry["local_path"]) if raw_entry and raw_entry.get("local_path") else None
+
+    if not raw_path or not raw_path.exists():
+        extension = url_extension(image_url)
+        raw_path = output_dirs["raw"] / f"{asset_key}{extension}"
+        log_event("download_raw", "started", image_url=image_url, local_path=str(raw_path))
+        download_to_file(image_url, str(raw_path))
+        log_event("download_raw", "success", image_url=image_url, local_path=str(raw_path))
+
+    canva_client = None
+    canva_asset_id = None
+
+    if args.sync:
+        sync_entry = find_stage_success(ledger_path, idempotency_key, "sync")
+        canva_asset_id = sync_entry.get("canva_asset_id") if sync_entry else None
+        if not canva_asset_id:
             canva_client = CanvaClient()
-            
-            print("🔄 Triggering Canva Autofill...")
-            # We pass the generated image as the 'Background' variable
-            job_id = canva_client.autofill_template(template_id, {"Background": image_url})
-            
-            # For brevity in this CLI, we'll output the job ID. 
-            # In a full production script, we would poll for completion.
-            print(f"✅ Canva Autofill Job Started: {job_id}")
-            print(f"View and export your finished design in the Canva dashboard.")
-        else:
-            print(f"🖼  Leonardo-Only Workflow: Asset is ready at {image_url}")
+            log_event("sync", "started", local_path=str(raw_path))
+            folder_id = canva_client.get_or_create_shadowpunk_folder(args.canva_folder)
+            upload_result = canva_client.upload_asset(
+                str(raw_path),
+                folder_id=folder_id,
+                folder_path=args.canva_folder,
+            )
+            canva_asset_id = upload_result["asset_id"]
+            log_event(
+                "sync",
+                "success",
+                local_path=str(raw_path),
+                canva_asset_id=canva_asset_id,
+                extras={
+                    "canva_folder_id": folder_id,
+                    "upload_job_id": upload_result.get("job_id"),
+                },
+            )
+
+    design_id = None
+    if args.autofill:
+        template_id = config.get("canva_templates", {}).get(asset_key)
+        if not template_id or template_id == "TEMPLATE_ID_HERE":
+            raise ValueError(f"No valid canva_templates mapping found for '{asset_key}'")
+
+        autofill_entry = find_stage_success(ledger_path, idempotency_key, "autofill")
+        design_id = autofill_entry.get("design_id") if autofill_entry else None
+
+        if not design_id:
+            if canva_client is None:
+                canva_client = CanvaClient()
+            log_event("autofill", "started", image_url=image_url)
+            autofill_job_id = canva_client.autofill_template(
+                template_id,
+                {"Background": image_url},
+            )
+            wait_result = canva_client.wait_for_autofill_job(autofill_job_id)
+            design_id = wait_result.get("design_id")
+            if not design_id:
+                log_event("autofill", "failed", error="Autofill completed without design ID")
+                raise ApiResponseError("Autofill completed without a design ID")
+            log_event(
+                "autofill",
+                "success",
+                design_id=design_id,
+                extras={"autofill_job_id": autofill_job_id},
+            )
+
+    export_path = None
+    if args.export_format:
+        export_entry = find_stage_success(ledger_path, idempotency_key, "export")
+        export_path = export_entry.get("export_path") if export_entry else None
+
+        if not export_path:
+            if canva_client is None:
+                canva_client = CanvaClient()
+            log_event("export", "started", design_id=design_id)
+            export_job_id = canva_client.export_design(design_id, args.export_format)
+            wait_result = canva_client.wait_for_export_job(export_job_id)
+            urls = wait_result.get("download_urls", [])
+            if not urls:
+                log_event("export", "failed", design_id=design_id, error="No export download URL returned")
+                raise ApiResponseError("Export completed without download URLs")
+
+            resolved_export_path = output_dirs["exports"] / f"{asset_key}_{run_id}.{args.export_format}"
+            download_to_file(urls[0], str(resolved_export_path))
+            export_path = str(resolved_export_path)
+            log_event(
+                "export",
+                "success",
+                design_id=design_id,
+                export_path=export_path,
+                extras={"export_job_id": export_job_id, "export_url": urls[0]},
+            )
+
+    print("✅ Pipeline complete")
+    print(f"Run ID: {run_id}")
+    print(f"Image URL: {image_url}")
+    print(f"Raw file: {raw_path}")
+    if canva_asset_id:
+        print(f"Canva Asset ID: {canva_asset_id}")
+    if design_id:
+        print(f"Canva Design ID: {design_id}")
+    if export_path:
+        print(f"Export file: {export_path}")
+    print(f"Ledger: {ledger_path}")
+    return 0
+
+
+def main() -> int:
+    load_environment()
+    config = load_prompts()
+    parser = create_parser()
+    args = parser.parse_args()
+
+    try:
+        if args.command == "generate-browser":
+            return run_generate_browser(args, config)
+        if args.command == "generate-api":
+            return run_generate_api(args, config)
+        parser.error(f"Unsupported command: {args.command}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"❌ Error: {exc}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

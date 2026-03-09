@@ -2,6 +2,7 @@ import os
 import pytest
 import responses
 from apis.leonardo_api import LeonardoClient
+from lib.errors import TimeoutError as ApiTimeoutError
 
 @pytest.fixture
 def mock_env(monkeypatch):
@@ -55,8 +56,9 @@ def test_get_generation_result_complete(mock_env):
         status=200
     )
     
-    urls = client.get_generation_result("test_gen_id")
-    assert urls == ["http://test.url/image1.png"]
+    result = client.get_generation_result("test_gen_id")
+    assert result["generation_id"] == "test_gen_id"
+    assert result["urls"] == ["http://test.url/image1.png"]
 
 @responses.activate
 def test_get_generation_result_timeout(mock_env):
@@ -70,5 +72,5 @@ def test_get_generation_result_timeout(mock_env):
     )
     
     # Should timeout because it stays pending
-    with pytest.raises(TimeoutError):
+    with pytest.raises(ApiTimeoutError):
         client.get_generation_result("test_gen_id", max_retries=2, wait_seconds=0.1)
