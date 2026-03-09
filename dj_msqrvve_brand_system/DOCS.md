@@ -34,7 +34,16 @@ python src/main.py generate-browser "your prompt"
 If you have a `LEONARDO_API_KEY` and credits:
 ```bash
 python src/main.py generate-api social_banner_bg
+python src/main.py generate-api social_banner_bg --sync
+python src/main.py generate-api social_banner_bg --sync --autofill --export png
 ```
+
+Optional flags:
+- `--sync`: upload generated local asset to Canva.
+- `--autofill`: run template autofill using configured `canva_templates`.
+- `--export <format>`: export the autofilled design (requires `--autofill`).
+- `--canva-folder <path>`: override upload folder (default `Shadowpunk/Generations`).
+- `--run-id <id>`: reuse run identity for idempotent retries.
 
 ## 🧪 Testing
 Run the unit tests to ensure the libraries are healthy:

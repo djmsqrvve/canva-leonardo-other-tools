@@ -14,6 +14,7 @@ Runs on [http://localhost:6767](http://localhost:6767).
 
 ```bash
 npm run lint
+npm run test
 ```
 
 ## Build

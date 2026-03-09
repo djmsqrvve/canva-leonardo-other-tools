@@ -13,9 +13,9 @@ Target: Finalize the "Shadowpunk Vault" and solidify the "Down-to-the-Tee" CLI.
 - [ ] **JSON Data Logging:** Implement a local `ledger.json` to track every generation (Prompt, URL, Canva Design ID) for easier debugging and retrieval.
 
 ## 🧪 Verification
-- [ ] **End-to-End Test:** Successfully run `dj generate-api helix_tileset --sync` and verify the image appears in the Canva "Shadowpunk" folder.
+- [ ] **End-to-End Test:** Successfully run `python src/main.py generate-api helix2000_tileset_grass --sync` and verify the image appears in the Canva "Shadowpunk" folder.
 - [ ] **Dashboard Sync:** Ensure the Next.js Dashboard gallery refreshes automatically when a new asset is synced to the vault.
 
 ---
 **Current Port:** Dashboard running on http://localhost:6767
-**Active Branch:** master (all changes committed)
+**Active Branch:** main (all changes committed)

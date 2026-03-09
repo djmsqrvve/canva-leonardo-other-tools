@@ -2,17 +2,19 @@
 
 ## Workflow
 
-1. Start from a clean `main`:
+1. Start from a clean `main` and create a focused branch:
 ```bash
 git checkout main
 git pull --ff-only origin main
+git checkout -b feature/<short-scope>
 ```
 2. Make focused changes and verify locally:
 ```bash
 make health
 ```
 3. Commit in small units with clear intent.
-4. Push immediately after each verified commit to keep remote history current.
+4. Push the branch and open a PR using `.github/pull_request_template.md`.
+5. Merge to `main` only after test evidence is documented.
 
 ## Commit Message Standard
 

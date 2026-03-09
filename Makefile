@@ -1,6 +1,7 @@
 SHELL := /usr/bin/env bash
 
-PYTHON := ./dj_msqrvve_brand_system/venv/bin/python
+PYTHON := $(if $(wildcard ./dj_msqrvve_brand_system/venv/bin/python),./dj_msqrvve_brand_system/venv/bin/python,python3)
+CLI_PYTHON := $(if $(wildcard ./dj_msqrvve_brand_system/venv/bin/python),./venv/bin/python,python3)
 CLI_DIR := ./dj_msqrvve_brand_system
 DASHBOARD_DIR := ./dashboard
 
@@ -10,7 +11,7 @@ status:
 	git status --short --branch
 
 cli-help:
-	cd $(CLI_DIR) && PYTHONPATH=src ./venv/bin/python src/main.py --help
+	cd $(CLI_DIR) && PYTHONPATH=src $(CLI_PYTHON) src/main.py --help
 
 test:
 	$(PYTHON) -m pytest

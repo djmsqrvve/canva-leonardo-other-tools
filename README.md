@@ -68,6 +68,20 @@ A Next.js 16 control center running on **port 6767**.
    ```
    *Access at http://localhost:6767*
 
+### Core CLI Commands
+```bash
+cd dj_msqrvve_brand_system
+python src/main.py generate-api social_banner_bg
+python src/main.py generate-api social_banner_bg --sync --canva-folder "Shadowpunk/Generations"
+python src/main.py generate-api social_banner_bg --sync --autofill --export png
+```
+
+Output artifacts and ledger are written under:
+- `dj_msqrvve_brand_system/outputs/raw/<run_id>/`
+- `dj_msqrvve_brand_system/outputs/canva/<run_id>/`
+- `dj_msqrvve_brand_system/outputs/exports/<run_id>/`
+- `dj_msqrvve_brand_system/outputs/ledger.jsonl`
+
 ## 🧪 Testing
 Run the comprehensive test suite to ensure pipeline health:
 ```bash

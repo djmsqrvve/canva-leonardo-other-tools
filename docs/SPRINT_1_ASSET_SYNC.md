@@ -12,7 +12,7 @@
 - Automatically uploads new local files to the corresponding Canva folder.
 
 ### 1.3 CLI Integration
-- Add `dj generate-api --sync` flag to automatically push Leonardo results to Canva.
+- Add `python src/main.py generate-api <asset_key> --sync` support to automatically push Leonardo results to Canva.
 
 ## ✅ Definition of Done
 - A local file can be uploaded to a specific Canva folder via a single CLI command.

@@ -12,8 +12,8 @@
 - Implement specialized routines (resize to power-of-two for Bevy, create 9-slice UI for Roblox).
 
 ### 3.3 Final "Down-to-the-Tee" CLI CLI Commands
-- `dj download [design_id]`: Manual download of any Canva design in the account.
-- `dj asset-master [id]`: A "magic" command that downloads, processes, and pushes a Canva asset into the project folders (`helix`, `bevy`, `obs`).
+- `python src/main.py generate-api <asset_key> --autofill --export png`: End-to-end design export flow.
+- Future command concept: `python src/main.py asset-master [id]` to download/process/push a Canva asset into project folders (`helix`, `bevy`, `obs`).
 
 ## ✅ Definition of Done
 - A final PNG or MP4 asset is generated from a text prompt and lands in the target project folder without any manual Canva work.
