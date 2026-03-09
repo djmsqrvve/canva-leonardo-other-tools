@@ -1,0 +1,76 @@
+# Operations And Validation
+
+## Local Setup
+Python:
+```bash
+cd dj_msqrvve_brand_system
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
+Optional browser support:
+```bash
+pip install -r requirements-browser.txt
+```
+
+Dashboard:
+```bash
+cd ../dashboard
+npm install
+```
+
+## Core Environment Variables
+- `LEONARDO_API_KEY`: required for `generate-api`
+- `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`: required for Canva OAuth bootstrap and refresh
+- `CANVA_ACCESS_TOKEN`: required for Canva sync/autofill/export unless refresh flow can mint a new access token
+- `CANVA_REFRESH_TOKEN`: optional but recommended for Canva token renewal
+- `CANVA_INCLUDE_AUTOFILL_SCOPES=1`: include brand-template scopes when bootstrapping Canva auth
+- `CHROME_BINARY`: optional local Chrome override for browser mode
+
+## Validation Tiers
+- `make health`: Python tests plus CLI help smoke check
+- `make full-check`: `make health` plus dashboard lint, tests, and production build
+- `python src/test_health.py`: manual live-provider auth checks
+- `python src/test_health.py state --asset-key <asset_key>`: local readiness summary
+- `python src/test_health.py smoke-plan --asset-key <asset_key>`: supported live smoke sequence
+
+## Local State Files
+- `dj_msqrvve_brand_system/outputs/ledger.jsonl`
+- `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`
+- `dj_msqrvve_brand_system/outputs/browser-artifacts/`
+- `dj_msqrvve_brand_system/user_profile/`
+- `dj_msqrvve_brand_system/config/prompts.local.yaml`
+
+## Live Smoke Workflow
+Start with:
+```bash
+cd dj_msqrvve_brand_system
+python src/test_health.py auth
+python src/test_health.py smoke-plan --asset-key social_banner_bg
+```
+
+Supported manual smoke sequence:
+1. Leonardo auth
+2. Canva auth and refresh readiness
+3. Leonardo API generation
+4. Canva sync
+5. Canva autofill and export after private template IDs exist
+6. Browser bootstrap or refresh
+7. Headless browser smoke
+8. Dashboard restart recovery
+
+## Restart Recovery Expectations
+- Dashboard queued jobs persist across restart.
+- Dashboard running jobs are converted to failed/retryable on restart.
+- API retries can reuse completed ledger stages when the same run ID is supplied.
+
+## Failure Triage
+- API pipeline failures print run ID, failed stage, ledger path, and output directories.
+- Browser failures write screenshot, HTML, and metadata artifacts under `outputs/browser-artifacts/`.
+- Dashboard issues should be checked against `outputs/dashboard-jobs.json` and dashboard test coverage.
+
+## Public Vs Private Config
+- Keep `config/prompts.yaml` public and placeholder-safe.
+- Put real `canva_templates` values in `config/prompts.local.yaml`.
+- Do not commit tenant secrets, real Canva template IDs, or private credentials.

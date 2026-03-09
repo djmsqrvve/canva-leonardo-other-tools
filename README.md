@@ -134,5 +134,6 @@ If the dashboard restarts, queued jobs are restored and previously running jobs 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
 - [Python CLI Notes](dj_msqrvve_brand_system/DOCS.md)
+- [AI Handoff Suite](docs/ai-handoff/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Archived historical docs](docs/archive/README.md)
