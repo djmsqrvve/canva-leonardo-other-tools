@@ -11,11 +11,8 @@ Current truth:
 
 - Branch is `main`.
 - HEAD is `dbc6030`.
-- The worktree has uncommitted changes: the handoff suite expansion added
-  untracked files (`00_ACCURACY_AUDIT.md`, `AUDIT_REQUEST.md`,
-  `LIVE_SMOKE_AND_EVENT_INTEGRATION.md`, `PLAN.md`, `PROMPT.md`) and modified
-  `README.md`, `CURRENT_STATE.md`, and `OPERATIONS_AND_VALIDATION.md`.
-- These changes are intentional — they are the handoff suite itself.
+- The worktree is clean. The handoff suite expansion was committed at `5e18c1b`
+  and the Leonardo browser-only doc updates were committed at `a2c20fd`.
 
 ## Prior Claim: "The handoff suite lives in `docs/ai-handoff/README.md`."
 
@@ -40,6 +37,18 @@ Current truth:
 - `Makefile` contains both targets.
 - This audit confirmed command presence and repo state.
 - This audit did not rerun the commands.
+
+## Finding: Leonardo API Key Not Provisioned
+
+Status: `Documented`
+
+Current truth:
+
+- `LEONARDO_API_KEY` is not set in `.env`.
+- `generate-api` is blocked until the key is provisioned.
+- `generate-browser` (Selenium) is the active and supported generation path.
+- `test_health.py auth` Leonardo check reporting `[BLOCKED]` is expected.
+- Canva auth reporting `[OK]` is the meaningful signal for runtime readiness.
 
 ## Prior Claim Boundary Error
 
