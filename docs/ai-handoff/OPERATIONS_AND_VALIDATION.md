@@ -74,3 +74,20 @@ Supported manual smoke sequence:
 - Keep `config/prompts.yaml` public and placeholder-safe.
 - Put real `canva_templates` values in `config/prompts.local.yaml`.
 - Do not commit tenant secrets, real Canva template IDs, or private credentials.
+
+## Event Integration Boundary
+
+This repo owns the Canva and Leonardo runtime surface. It does not own the full
+MSQRVVE Madness event operating system.
+
+Cross-repo dependency:
+
+- event workspace:
+  `/home/dj/dev/brand/stream/events/msqrvve_madness_march_subathon_2026`
+- key event-side docs:
+  - `handoff/HANDOFF_PROJECT_CANVA_ASSET_PRODUCTION.md`
+  - `operations/CANVA_TEMPLATE_API_403_2026-03-08.md`
+  - `operations/CANVA_TEMPLATE_ID_REGISTRY_DAY02.md`
+
+Use this repo for generation/auth/runtime truth and the event workspace for
+launch readiness, blockers, and staged-asset coordination.
