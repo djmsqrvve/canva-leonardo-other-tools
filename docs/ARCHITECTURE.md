@@ -8,7 +8,7 @@
 ## Python CLI Flow
 `src/main.py` is the entrypoint for two local-first modes:
 - `generate-api` uses the Leonardo API, downloads the result, optionally uploads to Canva, optionally autofills a template, and optionally exports the finished design.
-- `generate-browser` drives the Leonardo web UI through Selenium using a persistent local Chrome profile.
+- `generate-browser` drives the Leonardo web UI through Selenium using a persistent local Firefox profile.
 
 The API path writes a JSONL ledger under `outputs/ledger.jsonl`. Ledger entries are keyed by a run ID plus prompt hash so completed stages can be reused on retries.
 
@@ -31,7 +31,7 @@ This is intentionally a single-process local queue, not a distributed worker sys
 ## External Dependencies
 - Leonardo API for production image generation
 - Canva Connect API for asset upload, autofill, and export
-- Local Chrome/Chromium plus Selenium for browser automation
+- Local Firefox plus Selenium for browser automation
 
 ## Supported vs Archived
 - Supported: the Python CLI, Canva/Leonardo API clients in `dj_msqrvve_brand_system/src/`, and the dashboard

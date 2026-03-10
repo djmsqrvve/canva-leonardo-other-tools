@@ -59,7 +59,7 @@ Relevant files:
 ## `generate-browser` Flow
 - Uses Selenium against Leonardo web UI.
 - Requires `requirements-browser.txt`.
-- Requires local Chrome or Chromium, either on `PATH` or via `CHROME_BINARY`.
+- Requires local Firefox, either on `PATH` or via `FIREFOX_BINARY`.
 - Headless mode only works after the local `user_profile/` contains a valid interactive session.
 - If the saved session expires, rerun `generate-browser` without `--headless` to refresh the profile.
 - Browser failures write artifacts to `outputs/browser-artifacts/`.

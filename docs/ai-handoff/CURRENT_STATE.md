@@ -35,7 +35,7 @@ This handoff reflects repo state as of March 9, 2026.
 - Canva requests retry once on `401` or `403` through the refresh flow when refresh credentials are available.
 - Public `config/prompts.yaml` keeps placeholder Canva template mappings.
 - Real Canva template IDs are expected in gitignored `config/prompts.local.yaml`.
-- Leonardo browser automation fails fast when optional deps, Chrome, or a bootstrapped profile are missing.
+- Leonardo browser automation fails fast when optional deps, Firefox, or a bootstrapped profile are missing.
 - Leonardo browser generation now uses adaptive result detection instead of a fixed wait.
 - Browser failures write local artifacts to `dj_msqrvve_brand_system/outputs/browser-artifacts/`.
 - The repo now has a supported manual live-provider smoke helper at `dj_msqrvve_brand_system/src/test_health.py`.

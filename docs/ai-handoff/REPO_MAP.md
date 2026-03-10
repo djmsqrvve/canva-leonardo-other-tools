@@ -37,7 +37,7 @@
 - `dj_msqrvve_brand_system/config/prompts.yaml`: public sample prompt config.
 - `dj_msqrvve_brand_system/config/prompts.local.example.yaml`: sample private Canva template override file.
 - `dj_msqrvve_brand_system/config/prompts.local.yaml`: gitignored private local override file used at runtime.
-- `dj_msqrvve_brand_system/user_profile/`: Chrome profile used by browser automation.
+- `dj_msqrvve_brand_system/user_profile/`: Firefox profile used by browser automation.
 - `dj_msqrvve_brand_system/outputs/ledger.jsonl`: API ledger.
 - `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`: dashboard queue persistence.
 - `dj_msqrvve_brand_system/outputs/browser-artifacts/`: browser failure screenshots, HTML dumps, and metadata.

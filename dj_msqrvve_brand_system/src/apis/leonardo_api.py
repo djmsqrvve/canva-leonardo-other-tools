@@ -85,7 +85,7 @@ class LeonardoClient:
         print(f"Triggering generation for prompt: '{prompt[:50]}...'")
         generation_id = self.generate_image(prompt, model_id, **kwargs)
         if not generation_id:
-            raise ApiResponseError("Failed to get generation ID from response.")
+            raise ApiResponseError(f"Failed to get generation ID from response (got {generation_id!r})")
         
         print(f"Waiting for generation {generation_id} to complete...")
         result = self.get_generation_result(generation_id)

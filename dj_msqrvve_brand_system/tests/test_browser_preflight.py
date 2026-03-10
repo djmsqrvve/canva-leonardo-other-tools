@@ -26,7 +26,7 @@ def test_headless_mode_requires_existing_profile(tmp_path):
     browser.headless = True
     browser.profile_path = tmp_path
 
-    with pytest.raises(BrowserPreflightError, match="logged-in Chrome profile"):
+    with pytest.raises(BrowserPreflightError, match="logged-in browser profile"):
         browser._ensure_profile_supports_mode()
 
 

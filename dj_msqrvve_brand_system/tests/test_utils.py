@@ -1,7 +1,8 @@
 import pytest
+from unittest.mock import patch, MagicMock
 
 from lib.errors import ApiResponseError, TimeoutError
-from lib.utils import compute_backoff_schedule, poll_job
+from lib.utils import compute_backoff_schedule, download_to_file, poll_job
 
 
 def test_compute_backoff_schedule():
@@ -54,6 +55,29 @@ def test_poll_job_failure():
             initial_delay_seconds=0,
             sleep_fn=lambda _seconds: None,
         )
+
+
+def test_download_to_file_empty_response(tmp_path):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.content = b""
+
+    with patch("lib.utils.requests.get", return_value=mock_response):
+        with pytest.raises(ApiResponseError, match="empty response"):
+            download_to_file("https://example.com/img.png", str(tmp_path / "out.png"))
+
+
+def test_download_to_file_html_content_type(tmp_path):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.content = b"<html>error</html>"
+    mock_response.headers = {"content-type": "text/html; charset=utf-8"}
+
+    with patch("lib.utils.requests.get", return_value=mock_response):
+        with pytest.raises(ApiResponseError, match="text/html"):
+            download_to_file("https://example.com/img.png", str(tmp_path / "out.png"))
 
 
 def test_poll_job_timeout():

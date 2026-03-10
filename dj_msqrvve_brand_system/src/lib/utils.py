@@ -97,5 +97,14 @@ def download_to_file(url: str, output_path: str, *, timeout_seconds: int = 60) -
     except Exception as exc:  # noqa: BLE001
         handle_request_exception(exc, f"download from {url}")
 
+    if not response.content:
+        raise ApiResponseError(f"Download returned empty response from {url}")
+
+    content_type = response.headers.get("content-type", "")
+    if "text/html" in content_type:
+        raise ApiResponseError(
+            f"Expected binary content but got text/html from {url}"
+        )
+
     with open(output_path, "wb") as file_obj:
         file_obj.write(response.content)

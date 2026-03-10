@@ -291,7 +291,9 @@ export class JobRuntime {
 
     const payload = serializePersistedState(this.jobOrder, this.jobsById, this.queue);
     fs.mkdirSync(path.dirname(this.persistencePath), { recursive: true });
-    fs.writeFileSync(this.persistencePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    const tmpPath = `${this.persistencePath}.tmp`;
+    fs.writeFileSync(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    fs.renameSync(tmpPath, this.persistencePath);
   }
 
   #dispatch() {

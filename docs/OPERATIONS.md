@@ -47,7 +47,7 @@ Notes:
 - `--autofill` and `--export` fail fast when a template mapping is missing, blank, or still set to `TEMPLATE_ID_HERE`.
 
 ## Browser Automation Bootstrap
-Dashboard browser jobs run headless and expect an existing logged-in Chrome profile.
+Dashboard browser jobs run headless and expect an existing logged-in Firefox profile.
 
 Bootstrap the profile once with an interactive run:
 ```bash
@@ -55,7 +55,7 @@ cd dj_msqrvve_brand_system
 python src/main.py generate-browser "your prompt"
 ```
 
-If Chrome is not on `PATH`, set `CHROME_BINARY` in the shell before running the command.
+If Firefox is not on `PATH`, set `FIREFOX_BINARY` in the shell before running the command.
 
 Notes:
 - `generate-browser --headless` is only supported after the interactive bootstrap has already populated `user_profile/`.

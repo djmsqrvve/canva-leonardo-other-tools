@@ -117,7 +117,7 @@ class CanvaClient:
         response = self.autofill.start_autofill_job(template_id, data)
         job_id = response.get("job", {}).get("id")
         if not job_id:
-            raise ApiResponseError("Canva autofill did not return a job ID.")
+            raise ApiResponseError(f"Canva autofill did not return a job ID: {response}")
         return job_id
 
     def wait_for_autofill_job(self, job_id: str) -> dict[str, Any]:
@@ -142,7 +142,7 @@ class CanvaClient:
         response = self.exports.start_export_job(design_id, format_type)
         job_id = response.get("job", {}).get("id")
         if not job_id:
-            raise ApiResponseError("Canva export did not return a job ID.")
+            raise ApiResponseError(f"Canva export did not return a job ID: {response}")
         return job_id
 
     def wait_for_export_job(self, job_id: str) -> dict[str, Any]:

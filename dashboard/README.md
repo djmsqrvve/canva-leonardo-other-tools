@@ -21,7 +21,7 @@ npm run build
 ## Runtime Notes
 - The dashboard shells out to `../dj_msqrvve_brand_system/src/main.py`.
 - Job state is persisted to `../dj_msqrvve_brand_system/outputs/dashboard-jobs.json`.
-- Browser automation jobs run headless and require an existing bootstrapped Chrome profile.
+- Browser automation jobs run headless and require an existing bootstrapped Firefox profile.
 - The queue is intentionally single-worker and local-first.
 - Supported execution uses the queue-backed `/api/jobs` routes only.
 - Dashboard API routes reject non-localhost traffic.

@@ -12,12 +12,12 @@ SELENIUM_IMPORT_ERROR = None
 
 try:
     from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.firefox.options import Options
+    from selenium.webdriver.firefox.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
-    from webdriver_manager.chrome import ChromeDriverManager
+    from webdriver_manager.firefox import GeckoDriverManager
 except ModuleNotFoundError as exc:  # pragma: no cover - exercised via preflight tests
     SELENIUM_IMPORT_ERROR = exc
     webdriver = None
@@ -26,23 +26,21 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised via preflight
     By = None
     EC = None
     WebDriverWait = None
-    ChromeDriverManager = None
+    GeckoDriverManager = None
 
 
 GENERATE_BUTTON_XPATH = "//button[contains(., 'Generate')]"
 PROMPT_TEXTAREA_SELECTOR = "textarea[placeholder*='Type a prompt']"
-GALLERY_IMAGE_SELECTOR = "img.generation-image"
+GALLERY_IMAGE_SELECTOR = "img[src*='cdn.leonardo.ai']"
+DIALOG_OVERLAY_SELECTOR = "[data-slot='dialog-overlay']"
 LEONARDO_LOGIN_URL = "https://app.leonardo.ai/auth/login"
 LEONARDO_IMAGE_GENERATION_URL = "https://app.leonardo.ai/image-generation"
 AUTH_PAGE_MARKERS = ("continue with google", "sign in", "log in", "login")
 GENERATION_TIMEOUT_SECONDS = 180
 GENERATION_POLL_INTERVAL_SECONDS = 2.0
-CHROME_CANDIDATES = (
-    "google-chrome",
-    "google-chrome-stable",
-    "chromium-browser",
-    "chromium",
-    "chrome",
+FIREFOX_CANDIDATES = (
+    "firefox",
+    "firefox-esr",
 )
 
 
@@ -57,28 +55,28 @@ class LeonardoBrowser:
         self.headless = headless
         self.login_timeout_seconds = login_timeout_seconds
         project_root = Path(__file__).resolve().parent.parent.parent
-        self.profile_path = project_root / "user_profile"
+        self.profile_path = Path(
+            os.environ.get("FIREFOX_PROFILE", str(project_root / "user_profile"))
+        )
         self.artifact_root = project_root / "outputs" / "browser-artifacts"
 
         self._ensure_optional_dependencies()
-        self.chrome_binary = self._resolve_chrome_binary()
+        self.browser_binary = self._resolve_browser_binary()
         self._ensure_profile_supports_mode()
         self.profile_path.mkdir(parents=True, exist_ok=True)
 
-        chrome_options = Options()
+        firefox_options = Options()
         if headless:
-            chrome_options.add_argument("--headless=new")
+            firefox_options.add_argument("-headless")
 
-        chrome_options.add_argument(f"user-data-dir={self.profile_path}")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        if self.chrome_binary:
-            chrome_options.binary_location = self.chrome_binary
+        firefox_options.add_argument("-profile")
+        firefox_options.add_argument(str(self.profile_path))
+        if self.browser_binary:
+            firefox_options.binary_location = self.browser_binary
 
-        self.driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=chrome_options,
+        self.driver = webdriver.Firefox(
+            service=Service(GeckoDriverManager().install()),
+            options=firefox_options,
         )
         self.wait = WebDriverWait(self.driver, 30)
 
@@ -90,22 +88,22 @@ class LeonardoBrowser:
             "Install dj_msqrvve_brand_system/requirements-browser.txt to enable it."
         ) from SELENIUM_IMPORT_ERROR
 
-    def _resolve_chrome_binary(self) -> str | None:
-        explicit_binary = os.environ.get("CHROME_BINARY", "").strip()
+    def _resolve_browser_binary(self) -> str | None:
+        explicit_binary = os.environ.get("FIREFOX_BINARY", "").strip()
         if explicit_binary:
             if Path(explicit_binary).exists():
                 return explicit_binary
             raise BrowserPreflightError(
-                f"CHROME_BINARY points to '{explicit_binary}', but that path does not exist."
+                f"Browser binary path '{explicit_binary}' does not exist."
             )
 
-        for candidate in CHROME_CANDIDATES:
+        for candidate in FIREFOX_CANDIDATES:
             resolved = shutil.which(candidate)
             if resolved:
                 return resolved
 
         raise BrowserPreflightError(
-            "Chrome/Chromium was not found on PATH. Install Chrome locally or set CHROME_BINARY."
+            "Firefox was not found on PATH. Install Firefox locally or set FIREFOX_BINARY."
         )
 
     def _profile_has_session_data(self) -> bool:
@@ -117,7 +115,7 @@ class LeonardoBrowser:
         # Headless mode is only safe once the interactive login has already populated the profile.
         if self.headless and not self._profile_has_session_data():
             raise BrowserPreflightError(
-                "Headless browser generation requires an existing logged-in Chrome profile. "
+                "Headless browser generation requires an existing logged-in browser profile. "
                 f"Run {_bootstrap_command()} without --headless once to bootstrap the session."
             )
 
@@ -179,12 +177,48 @@ class LeonardoBrowser:
             f"{artifact_hint}"
         )
 
+    def _dismiss_modal_if_present(self) -> None:
+        """Dismiss any open dialog overlay (e.g. What's New announcements).
+
+        Uses JS to click a dismiss button by text content first, then falls back
+        to forcefully removing both the overlay and dialog content from the DOM.
+        """
+        overlays = self.driver.find_elements(By.CSS_SELECTOR, DIALOG_OVERLAY_SELECTOR)
+        if not overlays:
+            return
+
+        # Use JS to find and click a dismiss button by visible text — bypasses interactability checks
+        dismissed = self.driver.execute_script("""
+            const labels = ["let's go", "let's go!", "got it", "ok", "okay", "close", "dismiss", "continue", "skip", "start creating"];
+            const buttons = Array.from(document.querySelectorAll('button'));
+            for (const btn of buttons) {
+                if (labels.includes((btn.innerText || '').trim().toLowerCase())) {
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+        """)
+        if dismissed:
+            time.sleep(0.8)
+            return
+
+        # Force-remove the overlay and any open dialog content from the DOM
+        self.driver.execute_script("""
+            document.querySelectorAll("[data-slot='dialog-overlay']").forEach(el => el.remove());
+            document.querySelectorAll("[data-slot='dialog-content']").forEach(el => el.remove());
+            document.querySelectorAll("[role='dialog']").forEach(el => el.remove());
+        """)
+        time.sleep(0.5)
+
     def _collect_generation_image_urls(self, limit: int = 8) -> list[str]:
         urls: list[str] = []
         seen: set[str] = set()
         for image in self.driver.find_elements(By.CSS_SELECTOR, GALLERY_IMAGE_SELECTOR):
             src = (image.get_attribute("src") or "").strip()
             if not src or src.startswith("data:") or src in seen:
+                continue
+            if "/generations/" not in src:
                 continue
             seen.add(src)
             urls.append(src)
@@ -263,13 +297,12 @@ class LeonardoBrowser:
             f"{artifact_hint}"
         )
 
-    def generate(self, prompt: str, model_id=None):
+    def generate(self, prompt: str):
         """
         Automate prompt entry and trigger generation in the Leonardo web UI.
 
         The selector set is intentionally centralized because Leonardo updates can break it.
         """
-        del model_id  # Browser mode currently drives the default web UI only.
         print(f"Triggering generation for prompt: '{prompt[:50]}...'")
         self.driver.get(LEONARDO_IMAGE_GENERATION_URL)
 
@@ -279,10 +312,15 @@ class LeonardoBrowser:
                 "Leonardo redirected to login before the generation page loaded.",
             )
 
+        self._dismiss_modal_if_present()
+        # Also check and dismiss after a short wait in case a second modal appears
+        time.sleep(1.0)
+        self._dismiss_modal_if_present()
+
         try:
             existing_urls = set(self._collect_generation_image_urls())
             prompt_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, PROMPT_TEXTAREA_SELECTOR))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, PROMPT_TEXTAREA_SELECTOR))
             )
             prompt_input.clear()
             prompt_input.send_keys(prompt)

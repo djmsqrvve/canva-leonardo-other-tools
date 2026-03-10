@@ -26,7 +26,7 @@ npm install
 - `CANVA_ACCESS_TOKEN`: required for Canva sync/autofill/export unless refresh flow can mint a new access token
 - `CANVA_REFRESH_TOKEN`: optional but recommended for Canva token renewal
 - `CANVA_INCLUDE_AUTOFILL_SCOPES=1`: include brand-template scopes when bootstrapping Canva auth
-- `CHROME_BINARY`: optional local Chrome override for browser mode
+- `FIREFOX_BINARY`: optional local Firefox override for browser mode
 
 ## Validation Tiers
 - `make health`: Python tests plus CLI help smoke check

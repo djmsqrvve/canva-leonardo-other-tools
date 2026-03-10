@@ -87,7 +87,7 @@ The dashboard binds to `127.0.0.1:6767`. Supported dashboard execution goes thro
 | `generate-api` | `LEONARDO_API_KEY` | Stable production path |
 | `generate-api --sync` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config | Uploads raw output to Canva |
 | `generate-api --autofill --export` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config, private `canva_templates` IDs in `config/prompts.local.yaml` | Public placeholder mappings are rejected |
-| `generate-browser` | `requirements-browser.txt`, local Chrome/Chromium | First login must be interactive; failures write local browser artifacts |
+| `generate-browser` | `requirements-browser.txt`, local Firefox | First login must be interactive; failures write local browser artifacts |
 | Dashboard browser jobs | Bootstrapped `user_profile/` | Dashboard browser jobs run headless, fail fast until the profile is seeded, and require an interactive re-bootstrap if the saved session expires |
 
 ## CLI Examples
@@ -121,12 +121,11 @@ If the dashboard restarts, queued jobs are restored and previously running jobs 
 - `docs/` - active architecture and operations docs
 - `docs/archive/` - historical planning, sprint, and handoff material
 - `archive/` - archived prototype/scaffold code
-- `assets/`, `game_assets/`, `stream_ops/`, `shared/`, `bevy_project/`, `pipeline_scripts/` - reference assets or adjacent project material
 
 ## Known Limitations
 - The dashboard queue is intentionally local-first and single-process; it is not a distributed worker system.
 - The dashboard API is intentionally localhost-only and binds to `127.0.0.1` by default.
-- Browser automation depends on Leonardo UI selectors and a locally bootstrapped Chrome profile. When the saved session expires or a selector breaks, inspect `outputs/browser-artifacts/` and refresh the profile with an interactive `generate-browser` run.
+- Browser automation depends on Leonardo UI selectors and a locally bootstrapped Firefox profile. When the saved session expires or a selector breaks, inspect `outputs/browser-artifacts/` and refresh the profile with an interactive `generate-browser` run.
 - Ledger history reflects API runs; browser jobs remain queue-tracked but do not write the API ledger.
 - There is no separate automated live-provider integration suite in CI. Provider auth and end-to-end smoke checks stay manual through `src/test_health.py` and the operations runbook.
 
