@@ -45,6 +45,7 @@ This handoff reflects repo state as of March 9, 2026.
 - Public docs must stay honest about tenant-specific configuration requirements.
 - The fastest way to understand current behavior is to read `src/main.py`, `src/auth_server.py`, `src/lib/leonardo_browser.py`, `dashboard/src/lib/job-runtime.js`, and `dashboard/src/lib/generation-command.js`.
 - Repo-level hardening gaps from the March 2026 cleanup pass are closed. The next meaningful work is usually live smoke execution against real local credentials, feature work, or bug fixes.
+- Leonardo generation uses `generate-browser` (Selenium) only. `LEONARDO_API_KEY` is not provisioned, so `generate-api` and the `test_health.py` Leonardo auth check are both blocked by design.
 - MSQRVVE Madness event delivery is cross-repo:
   - Canva runtime and dashboard live here
   - event ops live in `/home/dj/dev/brand/stream/events/msqrvve_madness_march_subathon_2026`

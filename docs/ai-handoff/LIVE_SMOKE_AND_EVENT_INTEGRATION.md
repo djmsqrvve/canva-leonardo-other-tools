@@ -38,10 +38,14 @@ Those live in:
 ## Suggested Smoke Sequence
 
 1. `cd /home/dj/dev/canva_leonardo_other_tools/dj_msqrvve_brand_system`
-2. `python src/test_health.py auth`
-3. `python src/test_health.py smoke-plan --asset-key social_banner_bg`
-4. verify event-side blocker state in the `brand` workspace before treating the
-   Canva lane as launch-ready
+2. `./venv/bin/python src/test_health.py auth`
+   — Leonardo will show `[BLOCKED]` (expected, no API key). Canva `[OK]` is the signal that matters.
+3. Bootstrap browser profile if not seeded: run `generate-browser` interactively
+   (without `--headless`) to log in and save `user_profile/`.
+4. `./venv/bin/python src/main.py generate-browser "<prompt>"` with `--headless`
+   to verify headless generation works.
+5. Verify event-side blocker state in the `brand` workspace before treating the
+   Canva lane as launch-ready.
 
 ## Acceptance For MSQRVVE Event Work
 

@@ -29,6 +29,14 @@ Key files:
 - `src/apis/canva_api.py`
 - `src/lib/pipeline.py`
 
+## Leonardo API Key Status
+
+`generate-api` requires `LEONARDO_API_KEY`. This key is not currently provisioned.
+Use `generate-browser` for all Leonardo generation tasks until an API key is available.
+
+`test_health.py auth` will report `[BLOCKED]` for the Leonardo check — this is
+expected and not a code defect.
+
 ## API Retry And Resume Model
 - Each API run gets a run ID.
 - A ledger idempotency key combines `run_id`, asset key, and prompt hash.

@@ -21,7 +21,7 @@ npm install
 ```
 
 ## Core Environment Variables
-- `LEONARDO_API_KEY`: required for `generate-api`
+- `LEONARDO_API_KEY`: required for `generate-api` — not currently provisioned; use `generate-browser` instead
 - `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`: required for Canva OAuth bootstrap and refresh
 - `CANVA_ACCESS_TOKEN`: required for Canva sync/autofill/export unless refresh flow can mint a new access token
 - `CANVA_REFRESH_TOKEN`: optional but recommended for Canva token renewal
@@ -46,19 +46,21 @@ npm install
 Start with:
 ```bash
 cd dj_msqrvve_brand_system
-python src/test_health.py auth
-python src/test_health.py smoke-plan --asset-key social_banner_bg
+./venv/bin/python src/test_health.py auth
+./venv/bin/python src/test_health.py smoke-plan --asset-key social_banner_bg
 ```
 
+Leonardo will show `[BLOCKED]` (expected — no API key). Canva `[OK]` is the
+meaningful signal.
+
 Supported manual smoke sequence:
-1. Leonardo auth
-2. Canva auth and refresh readiness
-3. Leonardo API generation
-4. Canva sync
+1. Canva auth and refresh readiness
+2. Browser bootstrap (interactive, one-time) — run `generate-browser` without `--headless` to seed `user_profile/`
+3. Headless browser smoke — `generate-browser --headless`
+4. Canva sync (after raw asset is in `outputs/`)
 5. Canva autofill and export after private template IDs exist
-6. Browser bootstrap or refresh
-7. Headless browser smoke
-8. Dashboard restart recovery
+6. Dashboard restart recovery
+7. (Future) Leonardo API generation — blocked until `LEONARDO_API_KEY` is provisioned
 
 ## Restart Recovery Expectations
 - Dashboard queued jobs persist across restart.
