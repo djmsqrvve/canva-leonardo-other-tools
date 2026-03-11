@@ -6,11 +6,23 @@
 - `docs/archive/` and `archive/` hold historical material that is not part of the supported runtime.
 
 ## Python CLI Flow
-`src/main.py` is the entrypoint for two local-first modes:
+`src/main.py` is the entrypoint for local-first modes:
 - `generate-api` uses the Leonardo API, downloads the result, optionally uploads to Canva, optionally autofills a template, and optionally exports the finished design.
 - `generate-browser` drives the Leonardo web UI through Selenium using a persistent local Firefox profile.
+- `generate-batch` runs multiple prompts (by category, all, or with variants) reusing one browser instance.
+- `canva-auth` checks and refreshes the Canva access token.
+- `gallery` launches a local Flask UI for browsing, rating, and comparing generated assets.
+- `suggest` recommends what to generate next based on ratings and ledger history.
 
-The API path writes a JSONL ledger under `outputs/ledger.jsonl`. Ledger entries are keyed by a run ID plus prompt hash so completed stages can be reused on retries.
+Both API and browser paths write a JSONL ledger under `outputs/ledger.jsonl`. Ledger entries are keyed by a run ID plus prompt hash so completed stages can be reused on retries.
+
+## Browser Hierarchy
+```
+BrowserBase (src/lib/browser/driver.py)
+├── LeonardoBrowser (src/lib/leonardo_browser.py)  — image generation
+└── CanvaBrowser (src/apis/canva/browser.py)       — design editor automation
+```
+Shared base handles Firefox lifecycle, profile sync, modal dismissal, and failure artifact capture. Site-specific subclasses handle login flows and page selectors.
 
 Canva API modules share one token manager. If `CANVA_REFRESH_TOKEN`, `CANVA_CLIENT_ID`, and `CANVA_CLIENT_SECRET` are configured, expired Canva access tokens are refreshed in-process and retried once.
 

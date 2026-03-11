@@ -7,7 +7,9 @@ Local-first automation for generating Leonardo imagery, syncing assets into Canv
 
 ## What Is Supported
 - Python CLI for Leonardo API generation, Canva sync, Canva autofill, and Canva export.
-- Local browser automation for Leonardo web generation after an interactive login bootstrap.
+- Local browser automation for Leonardo web generation and Canva editor automation.
+- Batch generation across categories with variant support.
+- Local asset gallery for browsing, rating, and comparing generated images.
 - Next.js dashboard for queueing jobs, monitoring status, and reviewing ledger-backed history.
 
 ## Quick Start
@@ -88,6 +90,10 @@ The dashboard binds to `127.0.0.1:6767`. Supported dashboard execution goes thro
 | `generate-api --sync` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config | Uploads raw output to Canva |
 | `generate-api --autofill --export` | `LEONARDO_API_KEY`, Canva access token or refresh-capable OAuth config, private `canva_templates` IDs in `config/prompts.local.yaml` | Public placeholder mappings are rejected |
 | `generate-browser` | `requirements-browser.txt`, local Firefox | First login must be interactive; failures write local browser artifacts |
+| `generate-batch` | Same as `generate-browser` | Batch by `--category`, `--all`, or `--variants N` |
+| `gallery` | None | Local Flask UI at `:6868` for browsing/rating assets |
+| `suggest` | None | Recommends next generations from ratings and ledger |
+| `canva-auth` | Canva access token or refresh-capable OAuth config | Check/refresh token status |
 | Dashboard browser jobs | Bootstrapped `user_profile/` | Dashboard browser jobs run headless, fail fast until the profile is seeded, and require an interactive re-bootstrap if the saved session expires |
 
 ## CLI Examples
@@ -111,6 +117,7 @@ python src/main.py generate-api madness_launch_key_art --autofill --export png
 - Canva exports: `dj_msqrvve_brand_system/outputs/exports/<run_id>/`
 - API ledger: `dj_msqrvve_brand_system/outputs/ledger.jsonl`
 - Browser failure artifacts: `dj_msqrvve_brand_system/outputs/browser-artifacts/<timestamp>-<phase>/`
+- Gallery ratings: `dj_msqrvve_brand_system/outputs/ratings.json`
 - Dashboard queue state: `dj_msqrvve_brand_system/outputs/dashboard-jobs.json`
 
 If the dashboard restarts, queued jobs are restored and previously running jobs are marked failed with a restart-specific error so they can be retried safely.
@@ -126,7 +133,7 @@ If the dashboard restarts, queued jobs are restored and previously running jobs 
 - The dashboard queue is intentionally local-first and single-process; it is not a distributed worker system.
 - The dashboard API is intentionally localhost-only and binds to `127.0.0.1` by default.
 - Browser automation depends on Leonardo UI selectors and a locally bootstrapped Firefox profile. When the saved session expires or a selector breaks, inspect `outputs/browser-artifacts/` and refresh the profile with an interactive `generate-browser` run.
-- Ledger history reflects API runs; browser jobs remain queue-tracked but do not write the API ledger.
+- Ledger history reflects both API and browser runs.
 - There is no separate automated live-provider integration suite in CI. Provider auth and end-to-end smoke checks stay manual through `src/test_health.py` and the operations runbook.
 
 ## Docs
