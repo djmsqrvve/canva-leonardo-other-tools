@@ -1,3 +1,4 @@
+import base64
 import json
 import mimetypes
 import os
@@ -20,7 +21,7 @@ class AssetsClient(CanvaBaseClient):
         return self._get(f"/folders/{folder_id}/items", params=params)
 
     def create_folder(self, name, parent_id="root"):
-        payload = {"name": name, "parent_id": parent_id}
+        payload = {"name": name, "parent_folder_id": parent_id}
         return self._post("/folders", json=payload)
 
     def _extract_items(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -60,6 +61,7 @@ class AssetsClient(CanvaBaseClient):
         return extract_nested(
             payload,
             (
+                "job.asset.id",
                 "asset.id",
                 "job.result.asset.id",
                 "job.result.asset_id",
@@ -107,10 +109,12 @@ class AssetsClient(CanvaBaseClient):
             response = self.list_folder_items(current_parent, item_types="folder")
             existing_folder_id = None
             for item in self._extract_items(response):
-                name = item.get("name")
-                item_type = (item.get("item_type") or item.get("type") or "").lower()
-                if name == segment and ("folder" in item_type or item_type == ""):
-                    existing_folder_id = item.get("id")
+                item_type = (item.get("type") or item.get("item_type") or "").lower()
+                inner = item.get("folder", {}) if "folder" in item_type else item
+                name = inner.get("name") or item.get("name")
+                folder_id = inner.get("id") or item.get("id")
+                if name == segment and folder_id:
+                    existing_folder_id = folder_id
                     break
 
             if existing_folder_id:
@@ -135,25 +139,37 @@ class AssetsClient(CanvaBaseClient):
         folder_id: Optional[str] = None,
         file_name: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Upload a file to Canva using job creation + signed binary upload + polling."""
+        """Upload a file to Canva via binary POST with metadata header."""
         resolved_name = file_name or os.path.basename(file_path)
-        mime_type = mimetypes.guess_type(resolved_name)[0] or "application/octet-stream"
-        upload_payload: dict[str, Any] = {
-            "name": resolved_name,
-            "content_type": mime_type,
+        metadata: dict[str, str] = {
+            "name_base64": base64.b64encode(resolved_name.encode()).decode(),
         }
         if folder_id:
-            upload_payload["parent_folder_id"] = folder_id
+            metadata["parent_folder_id"] = folder_id
 
-        init_response = self._post("/asset-uploads", json=upload_payload)
+        url = f"{self.BASE_URL}/asset-uploads"
+        request_headers = self._build_headers(refresh_if_missing=True)
+        request_headers["Content-Type"] = "application/octet-stream"
+        request_headers["Asset-Upload-Metadata"] = json.dumps(metadata)
+
+        with open(file_path, "rb") as f:
+            file_data = f.read()
+
+        try:
+            response = self._send_request(
+                "POST", url, headers=request_headers, data=file_data, timeout_seconds=60,
+            )
+        except Exception as exc:
+            handle_request_exception(exc, "upload asset to Canva")
+
+        if response.status_code >= 400:
+            from lib.errors import raise_for_http_error
+            raise_for_http_error(response)
+
+        init_response = response.json()
         job_id = self._extract_job_id(init_response)
-        upload_url = self._extract_upload_url(init_response)
         if not job_id:
             raise ApiResponseError("Canva upload did not return a job ID.")
-        if not upload_url:
-            raise ApiResponseError("Canva upload did not return a signed upload URL.")
-
-        self._upload_binary(upload_url, file_path, mime_type)
 
         completion_payload = poll_job(
             job_id,
@@ -180,7 +196,7 @@ class AssetsClient(CanvaBaseClient):
             "asset_id": asset_id,
             "folder_id": folder_id,
             "file_name": resolved_name,
-            "mime_type": mime_type,
+            "mime_type": mimetypes.guess_type(resolved_name)[0] or "application/octet-stream",
             "status_payload": completion_payload,
         }
 

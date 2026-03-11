@@ -193,7 +193,7 @@ def test_upload_asset_missing_job_id_raises(mock_env, tmp_path):
 
 
 @responses.activate
-def test_upload_asset_signed_upload_failure_raises(mock_env, tmp_path, monkeypatch):
+def test_upload_asset_http_error_raises(mock_env, tmp_path):
     client = CanvaClient()
     file_path = tmp_path / "asset.png"
     file_path.write_bytes(b"test-bytes")
@@ -201,28 +201,16 @@ def test_upload_asset_signed_upload_failure_raises(mock_env, tmp_path, monkeypat
     responses.add(
         responses.POST,
         f"{client.BASE_URL}/asset-uploads",
-        json={
-            "job": {"id": "upload_job_1"},
-            "upload_url": "https://upload.test/signed-url",
-        },
-        status=200,
+        json={"error": "bad request"},
+        status=400,
     )
 
-    class DummyResponse:
-        status_code = 500
-        text = "upload failed"
-
-    def fake_put(url, data, headers, timeout):
-        return DummyResponse()
-
-    monkeypatch.setattr("apis.canva.assets.requests.put", fake_put)
-
-    with pytest.raises(ApiResponseError, match="Signed upload failed"):
+    with pytest.raises(ApiResponseError, match="400"):
         client.upload_asset(str(file_path), folder_id="folder_generations")
 
 
 @responses.activate
-def test_upload_asset_terminal_failed_status_raises(mock_env, tmp_path, monkeypatch):
+def test_upload_asset_terminal_failed_status_raises(mock_env, tmp_path):
     client = CanvaClient()
     file_path = tmp_path / "asset.png"
     file_path.write_bytes(b"test-bytes")
@@ -230,10 +218,7 @@ def test_upload_asset_terminal_failed_status_raises(mock_env, tmp_path, monkeypa
     responses.add(
         responses.POST,
         f"{client.BASE_URL}/asset-uploads",
-        json={
-            "job": {"id": "upload_job_1"},
-            "upload_url": "https://upload.test/signed-url",
-        },
+        json={"job": {"id": "upload_job_1"}},
         status=200,
     )
     responses.add(
@@ -242,15 +227,6 @@ def test_upload_asset_terminal_failed_status_raises(mock_env, tmp_path, monkeypa
         json={"job": {"status": "FAILED"}},
         status=200,
     )
-
-    class DummyResponse:
-        status_code = 200
-        text = ""
-
-    def fake_put(url, data, headers, timeout):
-        return DummyResponse()
-
-    monkeypatch.setattr("apis.canva.assets.requests.put", fake_put)
 
     with pytest.raises(ApiResponseError, match="failed with status"):
         client.upload_asset(str(file_path), folder_id="folder_generations")

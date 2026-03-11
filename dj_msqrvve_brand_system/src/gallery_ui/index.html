@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DJ MSQRVVE Asset Gallery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; }
+  .header { background: linear-gradient(135deg, #1a0a2e, #0d1b2a); padding: 20px 24px; border-bottom: 1px solid #2a1a4e; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 1.4rem; background: linear-gradient(90deg, #00d4ff, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  select, button { background: #1a1a2e; color: #e0e0e0; border: 1px solid #333; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+  select:hover, button:hover { border-color: #00d4ff; }
+  button.active { background: #00d4ff22; border-color: #00d4ff; color: #00d4ff; }
+  .stats { font-size: 0.8rem; color: #888; padding: 8px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 16px 24px; }
+  .card { background: #12121f; border: 1px solid #222; border-radius: 10px; overflow: hidden; transition: border-color 0.2s, transform 0.2s; cursor: pointer; position: relative; }
+  .card:hover { border-color: #00d4ff; transform: translateY(-2px); }
+  .card.selected { border-color: #a855f7; box-shadow: 0 0 12px #a855f744; }
+  .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+  .card-meta { padding: 10px 12px; }
+  .card-meta .key { font-size: 0.8rem; color: #00d4ff; font-weight: 600; }
+  .card-meta .cat { font-size: 0.7rem; color: #888; margin-top: 2px; }
+  .card-meta .time { font-size: 0.65rem; color: #555; margin-top: 2px; }
+  .card-actions { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; }
+  .star { font-size: 1.2rem; cursor: pointer; color: #444; transition: color 0.15s; }
+  .star.filled { color: #f59e0b; }
+  .star:hover { color: #fbbf24; }
+  .fav { font-size: 1.1rem; cursor: pointer; color: #444; margin-left: auto; transition: color 0.15s; }
+  .fav.active { color: #ef4444; }
+  .fav:hover { color: #f87171; }
+
+  .lightbox { display: none; position: fixed; inset: 0; background: #000000ee; z-index: 100; align-items: center; justify-content: center; flex-direction: column; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 90vw; max-height: 80vh; border-radius: 8px; }
+  .lightbox .close { position: absolute; top: 16px; right: 24px; font-size: 2rem; color: #fff; cursor: pointer; }
+  .lightbox .meta { color: #aaa; margin-top: 12px; font-size: 0.85rem; }
+
+  .compare-bar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #1a0a2eee; border-top: 1px solid #2a1a4e; padding: 12px 24px; z-index: 50; text-align: center; }
+  .compare-bar.visible { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .compare-view { display: none; position: fixed; inset: 0; background: #0a0a0fee; z-index: 90; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+  .compare-view.open { display: flex; }
+  .compare-grid { display: flex; gap: 16px; max-width: 95vw; overflow-x: auto; align-items: center; }
+  .compare-grid img { max-height: 70vh; border-radius: 8px; border: 2px solid #333; }
+  .compare-view .close { position: absolute; top: 16px; right: 24px; font-size: 2rem; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>DJ MSQRVVE Asset Gallery</h1>
+  <div class="controls">
+    <select id="catFilter"><option value="">All Categories</option></select>
+    <select id="keyFilter"><option value="">All Asset Types</option></select>
+    <button id="favBtn">Favorites</button>
+    <button id="compareBtn">Compare Mode</button>
+  </div>
+</div>
+<div class="stats" id="stats"></div>
+<div class="grid" id="grid"></div>
+
+<div class="lightbox" id="lightbox">
+  <span class="close" onclick="closeLightbox()">&times;</span>
+  <img id="lbImg" src="">
+  <div class="meta" id="lbMeta"></div>
+</div>
+
+<div class="compare-bar" id="compareBar">
+  <span id="compareCount">0 selected</span>
+  <button onclick="openCompare()">Compare Selected</button>
+  <button onclick="exitCompareMode()">Cancel</button>
+</div>
+
+<div class="compare-view" id="compareView">
+  <span class="close" onclick="closeCompare()">&times;</span>
+  <div class="compare-grid" id="compareGrid"></div>
+</div>
+
+<script>
+let assets = [];
+let compareMode = false;
+let selected = new Set();
+let favOnly = false;
+
+async function fetchAssets() {
+  const params = new URLSearchParams();
+  const cat = document.getElementById('catFilter').value;
+  const key = document.getElementById('keyFilter').value;
+  if (cat) params.set('category', cat);
+  if (key) params.set('asset_key', key);
+  if (favOnly) params.set('favorites', 'true');
+  const resp = await fetch('/api/assets?' + params);
+  assets = await resp.json();
+  render();
+}
+
+async function fetchCategories() {
+  const resp = await fetch('/api/categories');
+  const cats = await resp.json();
+  const sel = document.getElementById('catFilter');
+  cats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+}
+
+function render() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  document.getElementById('stats').textContent = `${assets.length} asset(s)`;
+
+  const keys = [...new Set(assets.map(a => a.asset_key))].sort();
+  const keyFilter = document.getElementById('keyFilter');
+  const currentKey = keyFilter.value;
+  keyFilter.innerHTML = '<option value="">All Asset Types</option>';
+  keys.forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = k;
+    if (k === currentKey) opt.selected = true;
+    keyFilter.appendChild(opt);
+  });
+
+  assets.forEach((a, i) => {
+    const card = document.createElement('div');
+    card.className = 'card' + (selected.has(i) ? ' selected' : '');
+    const stars = [1,2,3,4,5].map(n =>
+      `<span class="star ${(a.rating || 0) >= n ? 'filled' : ''}" onclick="rate(${i}, ${n})">&starf;</span>`
+    ).join('');
+    card.innerHTML = `
+      <img src="${a.image_url}" loading="lazy" onclick="cardClick(${i})" />
+      <div class="card-meta">
+        <div class="key">${a.asset_key}</div>
+        <div class="cat">${a.category}</div>
+        <div class="time">${a.run_id} ${a.timestamp ? '| ' + a.timestamp.slice(0,19) : ''}</div>
+      </div>
+      <div class="card-actions">
+        ${stars}
+        <span class="fav ${a.favorite ? 'active' : ''}" onclick="toggleFav(${i})">&hearts;</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function cardClick(i) {
+  if (compareMode) {
+    if (selected.has(i)) selected.delete(i); else selected.add(i);
+    document.getElementById('compareCount').textContent = selected.size + ' selected';
+    render();
+  } else {
+    openLightbox(i);
+  }
+}
+
+function openLightbox(i) {
+  const a = assets[i];
+  document.getElementById('lbImg').src = a.image_url;
+  document.getElementById('lbMeta').textContent = `${a.asset_key} | ${a.category} | ${a.run_id}`;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+async function rate(i, n) {
+  event.stopPropagation();
+  const a = assets[i];
+  const resp = await fetch(`/api/assets/${a.run_id}/${a.filename}/rate`, {
+    method: 'POST', body: JSON.stringify({rating: n})
+  });
+  const data = await resp.json();
+  assets[i].rating = data.rating;
+  render();
+}
+
+async function toggleFav(i) {
+  event.stopPropagation();
+  const a = assets[i];
+  const resp = await fetch(`/api/assets/${a.run_id}/${a.filename}/rate`, {
+    method: 'POST', body: JSON.stringify({favorite: !a.favorite})
+  });
+  const data = await resp.json();
+  assets[i].favorite = data.favorite;
+  render();
+}
+
+document.getElementById('compareBtn').addEventListener('click', () => {
+  compareMode = !compareMode;
+  document.getElementById('compareBtn').classList.toggle('active', compareMode);
+  document.getElementById('compareBar').classList.toggle('visible', compareMode);
+  if (!compareMode) { selected.clear(); render(); }
+});
+
+function exitCompareMode() {
+  compareMode = false;
+  selected.clear();
+  document.getElementById('compareBtn').classList.remove('active');
+  document.getElementById('compareBar').classList.remove('visible');
+  render();
+}
+
+function openCompare() {
+  if (selected.size < 2) return;
+  const grid = document.getElementById('compareGrid');
+  grid.innerHTML = '';
+  selected.forEach(i => {
+    const img = document.createElement('img');
+    img.src = assets[i].image_url;
+    grid.appendChild(img);
+  });
+  document.getElementById('compareView').classList.add('open');
+}
+
+function closeCompare() {
+  document.getElementById('compareView').classList.remove('open');
+}
+
+document.getElementById('favBtn').addEventListener('click', () => {
+  favOnly = !favOnly;
+  document.getElementById('favBtn').classList.toggle('active', favOnly);
+  fetchAssets();
+});
+
+document.getElementById('catFilter').addEventListener('change', fetchAssets);
+document.getElementById('keyFilter').addEventListener('change', fetchAssets);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeLightbox(); closeCompare(); }
+});
+
+fetchCategories();
+fetchAssets();
+</script>
+</body>
+</html>

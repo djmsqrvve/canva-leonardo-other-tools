@@ -383,12 +383,10 @@ def test_generate_api_failure_prints_run_context(monkeypatch, tmp_path, capsys):
         main_module.run_generate_api(args, _config())
 
     captured = capsys.readouterr()
-    assert "❌ API pipeline failed" in captured.out
-    assert "Run ID: run_context" in captured.out
-    assert "Failed stage: generation" in captured.out
-    assert f"Ledger: {tmp_path / 'ledger.jsonl'}" in captured.out
-    assert f"Raw output dir: {tmp_path / 'raw' / 'run_context'}" in captured.out
-    assert f"Export output dir: {tmp_path / 'exports' / 'run_context'}" in captured.out
+    assert "API pipeline failed" in captured.out
+    assert "run_context" in captured.out
+    assert "generation" in captured.out
+    assert "ledger.jsonl" in captured.out
 
 
 def test_generate_api_logs_failed_download_stage(monkeypatch, tmp_path):

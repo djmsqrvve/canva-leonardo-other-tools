@@ -26,7 +26,7 @@ def test_headless_mode_requires_existing_profile(tmp_path):
     browser.headless = True
     browser.profile_path = tmp_path
 
-    with pytest.raises(BrowserPreflightError, match="logged-in browser profile"):
+    with pytest.raises(BrowserPreflightError, match="existing browser profile"):
         browser._ensure_profile_supports_mode()
 
 
@@ -34,8 +34,8 @@ def test_login_fails_fast_in_headless_mode_without_saved_session():
     browser = LeonardoBrowser.__new__(LeonardoBrowser)
     browser.headless = True
     browser.driver = DummyDriver()
+    browser.artifact_root = Path("/tmp/test-artifacts")
     browser._wait_for_dashboard_ready = lambda timeout_seconds=30: (_ for _ in ()).throw(RuntimeError("no session"))
-    browser._capture_failure_artifacts = lambda phase, reason: {}
 
     with pytest.raises(BrowserPreflightError, match="without --headless"):
         browser.login()
@@ -47,7 +47,7 @@ def test_capture_failure_artifacts_writes_page_and_metadata(tmp_path):
     browser.artifact_root = tmp_path
     browser.driver = DummyDriver()
 
-    artifacts = browser._capture_failure_artifacts("selector-failure", "generate button missing")
+    artifacts = browser.capture_failure("selector-failure", "generate button missing")
 
     screenshot_path = Path(artifacts["screenshot"])
     page_source_path = Path(artifacts["page_source"])
@@ -102,11 +102,11 @@ def test_generate_requires_session_refresh_when_login_redirect_detected():
 
     browser._is_auth_page = lambda: True
 
-    def raise_session_refresh(phase, reason):
+    def raise_session_expired(phase, reason):
         calls.append((phase, reason))
         raise BrowserPreflightError("refresh required")
 
-    browser._raise_session_refresh_required = raise_session_refresh
+    browser.raise_session_expired = raise_session_expired
 
     with pytest.raises(BrowserPreflightError, match="refresh required"):
         browser.generate("shadowpunk skyline")
@@ -114,6 +114,6 @@ def test_generate_requires_session_refresh_when_login_redirect_detected():
     assert calls == [
         (
             "generation-auth-required",
-            "Leonardo redirected to login before the generation page loaded.",
+            "Leonardo redirected to login before generation page loaded.",
         )
     ]

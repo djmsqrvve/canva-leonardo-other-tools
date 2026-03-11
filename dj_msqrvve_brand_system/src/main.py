@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from importlib import import_module
 from pathlib import Path
@@ -29,6 +30,7 @@ PROMPTS_CONFIG_PATH = Path("config/prompts.yaml")
 PROMPTS_LOCAL_OVERRIDE_PATH = Path("config/prompts.local.yaml")
 PROMPTS_LOCAL_EXAMPLE_PATH = Path("config/prompts.local.example.yaml")
 PLACEHOLDER_CANVA_TEMPLATE_ID = "TEMPLATE_ID_HERE"
+RATINGS_PATH = DEFAULT_OUTPUT_ROOT / "ratings.json"
 
 
 def load_environment() -> None:
@@ -122,6 +124,15 @@ def resolve_canva_template_id(config: dict, asset_key: str) -> str:
     return template_id
 
 
+def resolve_canva_folder(args: argparse.Namespace, prompt_data: dict | None) -> str:
+    cli_folder = getattr(args, "canva_folder", DEFAULT_CANVA_FOLDER)
+    if cli_folder != DEFAULT_CANVA_FOLDER:
+        return cli_folder
+    if prompt_data and prompt_data.get("canva_folder"):
+        return prompt_data["canva_folder"]
+    return cli_folder
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="DJ MSQRVVE Brand System CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -132,6 +143,12 @@ def create_parser() -> argparse.ArgumentParser:
     )
     browser_parser.add_argument("prompt_key", help="Key from prompts.yaml or a custom prompt string")
     browser_parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    browser_parser.add_argument("--sync", action="store_true", help="Upload generated assets to Canva")
+    browser_parser.add_argument(
+        "--canva-folder",
+        default=DEFAULT_CANVA_FOLDER,
+        help=f"Target Canva folder path for sync (default: {DEFAULT_CANVA_FOLDER})",
+    )
 
     api_parser = subparsers.add_parser(
         "generate-api",
@@ -162,6 +179,30 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional run ID for idempotent retries",
     )
+
+    batch_parser = subparsers.add_parser(
+        "generate-batch",
+        help="Generate multiple assets in one run",
+    )
+    batch_parser.add_argument("prompt_key", nargs="?", default=None, help="Single key for variant mode")
+    batch_parser.add_argument("--category", help="Generate all prompts in a category")
+    batch_parser.add_argument("--all", action="store_true", dest="all_prompts", help="Generate all prompts")
+    batch_parser.add_argument("--variants", type=int, default=1, help="Variants per prompt (default: 1)")
+    batch_parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    batch_parser.add_argument("--sync", action="store_true", help="Upload generated assets to Canva")
+    batch_parser.add_argument(
+        "--canva-folder",
+        default=DEFAULT_CANVA_FOLDER,
+        help=f"Target Canva folder path for sync (default: {DEFAULT_CANVA_FOLDER})",
+    )
+
+    subparsers.add_parser("canva-auth", help="Check Canva authentication status")
+
+    gallery_parser = subparsers.add_parser("gallery", help="Launch asset gallery UI")
+    gallery_parser.add_argument("--port", type=int, default=6868, help="Port (default: 6868)")
+
+    subparsers.add_parser("suggest", help="Suggest next generations based on ratings")
+
     return parser
 
 
@@ -185,23 +226,90 @@ def create_leonardo_browser(*, headless: bool):
     return browser_module.LeonardoBrowser(headless=headless)
 
 
-def run_generate_browser(args: argparse.Namespace, config: dict) -> int:
-    prompt = config.get("prompts", {}).get(args.prompt_key, {}).get("prompt", args.prompt_key)
+def run_generate_browser(args: argparse.Namespace, config: dict, *, browser=None) -> int:
+    prompt_data = config.get("prompts", {}).get(args.prompt_key, {})
+    prompt = prompt_data.get("prompt", args.prompt_key)
+    asset_key = args.prompt_key if args.prompt_key in config.get("prompts", {}) else "custom"
+    canva_folder = resolve_canva_folder(args, prompt_data)
+
     print("--- Starting Browser Automation Pipeline ---")
-    browser = create_leonardo_browser(headless=args.headless)
+    owns_browser = browser is None
+    if owns_browser:
+        browser = create_leonardo_browser(headless=args.headless)
     try:
         browser.login()
+
+        run_id = generate_run_id()
+        output_dirs = ensure_output_dirs(str(DEFAULT_OUTPUT_ROOT), run_id)
+        ledger_path = output_dirs["ledger"]
+        idempotency_key = make_idempotency_key(run_id, asset_key, prompt)
+
+        def log_event(stage: str, status: str, **kwargs):
+            event = build_ledger_event(
+                run_id=run_id,
+                asset_key=asset_key,
+                idempotency_key=idempotency_key,
+                stage=stage,
+                status=status,
+                **kwargs,
+            )
+            append_ledger_event(ledger_path, event)
+
+        log_event("generation", "started")
         image_urls = browser.generate(prompt)
-        if image_urls:
-            print(f"✅ Success! Retrieved {len(image_urls)} images:")
-            for index, url in enumerate(image_urls):
-                print(f"   [{index}] {url}")
-            return 0
-        print("❌ Generation failed or no images found.")
-        return 1
+        if not image_urls:
+            log_event("generation", "failed", error="No images found")
+            print("Generation failed or no images found.")
+            return 1
+
+        log_event("generation", "success", extras={"image_urls": image_urls})
+        print(f"Generated {len(image_urls)} images")
+
+        downloaded: list[Path] = []
+        for index, url in enumerate(image_urls):
+            ext = url_extension(url)
+            local_path = output_dirs["raw"] / f"browser_{index}{ext}"
+            try:
+                download_to_file(url, str(local_path))
+                downloaded.append(local_path)
+                log_event("download_raw", "success", image_url=url, local_path=str(local_path))
+                print(f"   Downloaded [{index}] -> {local_path}")
+            except Exception as exc:
+                log_event("download_raw", "failed", image_url=url, error=str(exc))
+                print(f"   Download [{index}] failed: {exc}")
+
+        if not downloaded:
+            print("All downloads failed.")
+            return 1
+
+        if args.sync:
+            print(f"Syncing {len(downloaded)} images to Canva folder: {canva_folder}")
+            canva_client = CanvaClient()
+            folder_id = canva_client.get_or_create_shadowpunk_folder(canva_folder)
+            for local_path in downloaded:
+                try:
+                    result = canva_client.upload_asset(
+                        str(local_path),
+                        folder_id=folder_id,
+                        folder_path=canva_folder,
+                    )
+                    log_event(
+                        "sync", "success",
+                        local_path=str(local_path),
+                        canva_asset_id=result["asset_id"],
+                    )
+                    print(f"   Uploaded {local_path.name} -> Canva asset {result['asset_id']}")
+                except Exception as exc:
+                    log_event("sync", "failed", local_path=str(local_path), error=str(exc))
+                    print(f"   Upload {local_path.name} failed: {exc}")
+
+        print(f"Pipeline complete (run_id: {run_id})")
+        print(f"Raw output: {output_dirs['raw']}")
+        return 0
     finally:
-        print("Closing browser...")
-        browser.close()
+        if owns_browser:
+            print("Closing browser...")
+            browser.close()
 
 
 def run_generate_api(args: argparse.Namespace, config: dict) -> int:
@@ -213,6 +321,7 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
     if args.export_format and not args.autofill:
         raise ValueError("--export requires --autofill to produce a design to export")
 
+    canva_folder = resolve_canva_folder(args, prompt_data)
     run_id = args.run_id or generate_run_id()
     output_dirs = ensure_output_dirs(str(DEFAULT_OUTPUT_ROOT), run_id)
     ledger_path = output_dirs["ledger"]
@@ -236,12 +345,8 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
     current_stage = "config"
 
     def print_failure_context() -> None:
-        print("❌ API pipeline failed")
-        print(f"Run ID: {run_id}")
-        print(f"Failed stage: {current_stage}")
-        print(f"Ledger: {ledger_path}")
-        print(f"Raw output dir: {output_dirs['raw']}")
-        print(f"Export output dir: {output_dirs['exports']}")
+        print(f"API pipeline failed at stage: {current_stage}")
+        print(f"Run ID: {run_id} | Ledger: {ledger_path}")
 
     model_key = prompt_data.get("model", "phoenix")
     model_id = config.get("models", {}).get(model_key)
@@ -314,11 +419,11 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
                 canva_client = CanvaClient()
                 log_event("sync", "started", local_path=str(raw_path))
                 try:
-                    folder_id = canva_client.get_or_create_shadowpunk_folder(args.canva_folder)
+                    folder_id = canva_client.get_or_create_shadowpunk_folder(canva_folder)
                     upload_result = canva_client.upload_asset(
                         str(raw_path),
                         folder_id=folder_id,
-                        folder_path=args.canva_folder,
+                        folder_path=canva_folder,
                     )
                     canva_asset_id = upload_result["asset_id"]
                 except Exception as exc:
@@ -407,7 +512,7 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
         print_failure_context()
         raise
 
-    print("✅ Pipeline complete")
+    print("Pipeline complete")
     print(f"Run ID: {run_id}")
     print(f"Image URL: {image_url}")
     print(f"Raw file: {raw_path}")
@@ -418,6 +523,167 @@ def run_generate_api(args: argparse.Namespace, config: dict) -> int:
     if export_path:
         print(f"Export file: {export_path}")
     print(f"Ledger: {ledger_path}")
+    return 0
+
+
+def run_generate_batch(args: argparse.Namespace, config: dict) -> int:
+    prompts = config.get("prompts", {})
+
+    if args.prompt_key:
+        if args.prompt_key not in prompts:
+            raise ValueError(f"Unknown prompt key: '{args.prompt_key}'")
+        keys = [args.prompt_key]
+    elif args.category:
+        keys = [k for k, v in prompts.items() if v.get("category") == args.category]
+        if not keys:
+            raise ValueError(f"No prompts found for category: '{args.category}'")
+    elif args.all_prompts:
+        keys = list(prompts.keys())
+    else:
+        raise ValueError("Specify a prompt_key, --category, or --all")
+
+    total = len(keys) * args.variants
+    print(f"--- Batch: {len(keys)} prompt(s) x {args.variants} variant(s) = {total} generation(s) ---")
+
+    browser = create_leonardo_browser(headless=args.headless)
+    results = []
+    try:
+        for key in keys:
+            for v in range(args.variants):
+                label = f"{key}" if args.variants == 1 else f"{key} (variant {v + 1})"
+                print(f"\n[{len(results) + 1}/{total}] {label}")
+                batch_args = argparse.Namespace(
+                    prompt_key=key,
+                    headless=args.headless,
+                    sync=args.sync,
+                    canva_folder=args.canva_folder,
+                )
+                try:
+                    rc = run_generate_browser(batch_args, config, browser=browser)
+                    results.append((label, "OK" if rc == 0 else "FAIL"))
+                except Exception as exc:
+                    print(f"   Error: {exc}")
+                    results.append((label, f"ERROR: {exc}"))
+    finally:
+        print("\nClosing browser...")
+        browser.close()
+
+    print("\n--- Batch Summary ---")
+    for label, status in results:
+        print(f"  {label}: {status}")
+    failures = sum(1 for _, s in results if s != "OK")
+    return 1 if failures else 0
+
+
+def run_canva_auth_check() -> int:
+    print("Checking Canva authentication...")
+    token = os.environ.get("CANVA_ACCESS_TOKEN")
+    if not token:
+        print("CANVA_ACCESS_TOKEN not set in .env")
+        return 1
+
+    import requests
+    resp = requests.get(
+        "https://api.canva.com/rest/v1/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+    )
+    if resp.status_code == 200:
+        user = resp.json()
+        user_id = user.get("team_user", {}).get("user_id", "unknown")
+        print(f"Canva auth OK (user: {user_id})")
+        return 0
+
+    if resp.status_code in (401, 403):
+        print(f"Token expired ({resp.status_code}). Attempting refresh...")
+        try:
+            canva = CanvaClient()
+            canva.token_manager.refresh_access_token()
+            print("Token refreshed successfully.")
+            return 0
+        except Exception as exc:
+            print(f"Refresh failed: {exc}")
+            print("Re-run: python src/auth_server.py")
+            return 1
+
+    print(f"Unexpected response: {resp.status_code} {resp.text[:200]}")
+    return 1
+
+
+def run_gallery(args: argparse.Namespace) -> int:
+    from gallery import create_gallery_app
+    app = create_gallery_app()
+    print(f"Gallery running at http://127.0.0.1:{args.port}")
+    app.run(host="127.0.0.1", port=args.port, debug=False)
+    return 0
+
+
+def load_ratings() -> dict:
+    if RATINGS_PATH.exists():
+        return json.loads(RATINGS_PATH.read_text(encoding="utf-8"))
+    return {}
+
+
+def run_suggest(config: dict) -> int:
+    prompts = config.get("prompts", {})
+    ratings = load_ratings()
+    ledger_path = DEFAULT_OUTPUT_ROOT / "ledger.jsonl"
+
+    generated_keys: set[str] = set()
+    if ledger_path.exists():
+        with ledger_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if event.get("stage") == "generation" and event.get("status") == "success":
+                    generated_keys.add(event.get("asset_key", ""))
+
+    categories: dict[str, list[str]] = {}
+    for key, data in prompts.items():
+        cat = data.get("category", "uncategorized")
+        categories.setdefault(cat, []).append(key)
+
+    favorites = {k: v for k, v in ratings.items() if v.get("favorite")}
+    top_rated = sorted(
+        ((k, v.get("rating", 0)) for k, v in ratings.items() if v.get("rating")),
+        key=lambda x: x[1],
+        reverse=True,
+    )
+
+    print("--- Suggestions ---\n")
+
+    if favorites:
+        print(f"Favorites ({len(favorites)}):")
+        for key in list(favorites)[:5]:
+            print(f"  {key}")
+        print(f"\nRe-roll favorites: python -m main generate-batch --regen-favorites --variants 3 --headless\n")
+
+    if top_rated:
+        print("Top rated:")
+        for key, rating in top_rated[:5]:
+            print(f"  {key} ({rating}/5)")
+        print()
+
+    missing = set(prompts.keys()) - generated_keys
+    if missing:
+        print(f"Not yet generated ({len(missing)}):")
+        for key in sorted(missing):
+            cat = prompts[key].get("category", "?")
+            print(f"  {key} [{cat}]")
+        by_cat = {}
+        for key in missing:
+            cat = prompts[key].get("category", "uncategorized")
+            by_cat.setdefault(cat, []).append(key)
+        for cat in sorted(by_cat):
+            print(f"\n  Generate {cat}: python -m main generate-batch --category {cat} --headless")
+    else:
+        print("All prompt keys have been generated at least once.")
+
     return 0
 
 
@@ -432,9 +698,17 @@ def main() -> int:
             return run_generate_browser(args, config)
         if args.command == "generate-api":
             return run_generate_api(args, config)
+        if args.command == "generate-batch":
+            return run_generate_batch(args, config)
+        if args.command == "canva-auth":
+            return run_canva_auth_check()
+        if args.command == "gallery":
+            return run_gallery(args)
+        if args.command == "suggest":
+            return run_suggest(config)
         parser.error(f"Unsupported command: {args.command}")
     except Exception as exc:  # noqa: BLE001
-        print(f"❌ Error: {exc}")
+        print(f"Error: {exc}")
         return 1
     return 0
 

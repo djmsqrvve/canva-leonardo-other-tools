@@ -184,7 +184,9 @@ class CanvaTokenManager:
             request_post=self.request_post,
             timeout_seconds=self.timeout_seconds,
         )
-        return self.persist_tokens(
+        new_token = self.persist_tokens(
             token_data["access_token"],
             refresh_token=token_data.get("refresh_token"),
         )
+        print("Canva access token refreshed and saved to .env")
+        return new_token

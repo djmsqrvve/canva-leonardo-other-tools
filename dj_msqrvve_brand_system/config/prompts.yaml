@@ -11,6 +11,8 @@ models:
 prompts:
   # --- SOCIAL MEDIA ---
   social_banner_bg:
+    category: "social"
+    canva_folder: "DJ Brand/Social Banners"
     description: "Background for Twitch/YouTube/Twitter banners."
     model: "phoenix"
     prompt: "Twilight shadowpunk cityscape, inverted googie organic forms, deep twilight purples and electric teals, bioluminescent tech glowing in the dark noir blacks, neon-deco style, cinematic lighting, 8k resolution, highly detailed, empty space in the center for text."
@@ -20,6 +22,8 @@ prompts:
     height: 1080
 
   profile_avatar:
+    category: "social"
+    canva_folder: "DJ Brand/Social Banners"
     description: "Character portrait for social profiles."
     model: "phoenix"
     prompt: "Cyberpunk character portrait, masquerave-noir theme, wearing a sleek bioluminescent mask, warm amber neon highlights, sleepywood mystique, polished and confident, masterpiece, vivid colors, dark background."
@@ -30,6 +34,8 @@ prompts:
 
   # --- STREAM ALERTS ---
   raid_alert_art:
+    category: "stream_alerts"
+    canva_folder: "DJ Brand/Stream Alerts"
     description: "Dynamic art for a raid alert."
     model: "phoenix"
     prompt: "A glowing neon sign displaying bioluminescent tech, masquerave-noir style, deep twilight purples and warm amber neon, cyberpunk wright architecture background, celebration mood, high quality."
@@ -38,6 +44,8 @@ prompts:
     height: 512
 
   follower_icon:
+    category: "stream_alerts"
+    canva_folder: "DJ Brand/Stream Alerts"
     description: "Small icon for new followers."
     model: "phoenix"
     prompt: "A small glowing orb, organic mossy greens and electric teals, sleepywood mystique, subtle orbit glow, isolated on black background, 3d render, high quality."
@@ -47,6 +55,8 @@ prompts:
 
   # --- MSQRVVE MADNESS (MARCH SUBATHON 2026) ---
   madness_launch_key_art:
+    category: "madness"
+    canva_folder: "DJ Brand/MSQRVVE Madness"
     description: "Primary launch hero art for MSQRVVE MADNESS."
     model: "phoenix"
     prompt: "MSQRVVE MADNESS subathon launch key art, high energy neon-deco x masquerave-noir visual style, bioluminescent streaks, futuristic stage atmosphere, dramatic cinematic lighting, composition with clear center safe zone for title text, no typography embedded."
@@ -56,6 +66,8 @@ prompts:
     height: 1080
 
   madness_countdown_story:
+    category: "madness"
+    canva_folder: "DJ Brand/MSQRVVE Madness"
     description: "Vertical countdown story panel for social promos."
     model: "phoenix"
     prompt: "Vertical social story art for MSQRVVE MADNESS countdown, cyberpunk event poster energy, neon cyan magenta gold accents, glowing timer motif, dynamic upward motion lines, clean central safe area for countdown text, no typography embedded."
@@ -65,6 +77,8 @@ prompts:
     height: 1920
 
   madness_schedule_card:
+    category: "madness"
+    canva_folder: "DJ Brand/MSQRVVE Madness"
     description: "Social schedule card background."
     model: "phoenix"
     prompt: "High contrast schedule card background for a livestream subathon, twilight shadowpunk architecture, geometric frame zones for schedule blocks, subtle decorative glow, premium editorial style, no typography embedded."
@@ -74,6 +88,8 @@ prompts:
     height: 1350
 
   madness_sub_goal_meter_bg:
+    category: "madness"
+    canva_folder: "DJ Brand/MSQRVVE Madness"
     description: "OBS HUD background plate for sub goal and timer."
     model: "phoenix"
     prompt: "Transparent-friendly styled HUD plate concept for live stream overlay, neon-deco plus googie-atomic accents, progress bar lanes, timer zone, elegant high tech frame, dark noir backdrop with luminous accents, no typography."
@@ -83,6 +99,8 @@ prompts:
     height: 1080
 
   madness_discord_banner:
+    category: "madness"
+    canva_folder: "DJ Brand/MSQRVVE Madness"
     description: "Discord announcement banner for event launch."
     model: "phoenix"
     prompt: "Discord announcement banner visual for MSQRVVE MADNESS, party energy, cyberpunk stage lights, vivid teal magenta brass palette, celebratory but clean composition with right-side safe area for copy, no embedded text."
@@ -92,6 +110,8 @@ prompts:
     height: 1080
 
   madness_game_vote_panel:
+    category: "madness"
+    canva_folder: "DJ Brand/MSQRVVE Madness"
     description: "Community vote panel visual."
     model: "phoenix"
     prompt: "Community vote panel artwork for livestream game selection, modular card zones for 4 game choices, bioluminescent borders, modern esports broadcast design language, high contrast readability layout, no typography."
@@ -102,6 +122,8 @@ prompts:
 
   # --- GAME ASSETS (HELIX 2000 - 2D) ---
   helix2000_tileset_grass:
+    category: "game_2d"
+    canva_folder: "DJ Brand/Game Assets"
     description: "Isometric grass/stone tileset for 2D game."
     model: "pixel_art"
     prompt: "2D game isometric tileset, sleepywood mystique, bioluminescent organic mossy greens, dark noir stone paths, pixel art hybrid, highly detailed, seamless texture."
@@ -110,6 +132,8 @@ prompts:
 
   # --- GAME ASSETS (HELIX MAIN - 3D) ---
   helix_main_texture_metal:
+    category: "game_3d"
+    canva_folder: "DJ Brand/Game Assets"
     description: "Seamless metal texture for 3D game."
     model: "kino"
     prompt: "Seamless texture, usonian-luxe architecture panel, glowing electric teal lines, deep twilight purple base metal, PBR material base, high resolution, photorealistic."
@@ -117,6 +141,8 @@ prompts:
     height: 1024
 
   bevy_skybox:
+    category: "game_3d"
+    canva_folder: "DJ Brand/Game Assets"
     description: "Equirectangular skybox for 3D engine."
     model: "phoenix"
     prompt: "360 degree equirectangular panorama skybox, deep twilight purples, massive inverted googie organic forms in the distance, neon-deco cityscape, glowing orbit rings in the sky, 8k resolution, highly detailed sky."

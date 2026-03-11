@@ -4,7 +4,8 @@
 
 Full repo review and cleanup. Fixed bugs, removed dead code, hardened downloads,
 made dashboard persistence atomic, and completed the Chrome-to-Firefox migration
-across all docs and config.
+across all docs and config. Completed Canva OAuth authorization — all scopes
+enabled and tokens saved to `.env`.
 
 ## Current repo state
 
@@ -48,11 +49,17 @@ across all docs and config.
 10. **Removed `model_id` param from `LeonardoBrowser.generate()`** — Was
     accepted then immediately `del`eted. No callers passed it.
 
+### Canva OAuth
+13. **Canva OAuth flow completed** — Ran `auth_server.py`, authorized via
+    browser with all scopes (`design:*`, `asset:*`, `folder:*`, `profile:read`,
+    `brandtemplate:*`). Access token and refresh token saved to `.env`.
+    Integration is in Draft status (sufficient for personal/dev use).
+
 ### Documentation & config
-11. **Chrome -> Firefox across 9 docs** — `ARCHITECTURE.md`, `OPERATIONS.md`,
+14. **Chrome -> Firefox across 9 docs** — `ARCHITECTURE.md`, `OPERATIONS.md`,
     `README.md`, `.env.example`, `dashboard/README.md`, and 5 `docs/ai-handoff/`
     files updated.
-12. **Removed deleted dirs from README repo map** — The `assets/`, `game_assets/`,
+15. **Removed deleted dirs from README repo map** — The `assets/`, `game_assets/`,
     etc. line was removed.
 
 ## Files modified
@@ -110,8 +117,8 @@ Deleted:
   interactive bootstrap of `user_profile/` before headless mode works.
 - **Dashboard**: Next.js at `dashboard/`, binds to `127.0.0.1:6767`.
   Job queue persisted to `outputs/dashboard-jobs.json`.
-- **Canva auth**: Token refresh via `canva/base.py` on 401/403. Tokens
-  stored in `.env`.
+- **Canva auth**: OAuth completed — tokens in `.env`. Token refresh via
+  `canva/base.py` on 401/403. Re-auth via `src/auth_server.py` if needed.
 - **Tests**: Run via `venv/bin/python -m pytest` from repo root (system
   python lacks deps). Dashboard tests via `npm test` in `dashboard/`.
 
