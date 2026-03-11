@@ -1,51 +1,70 @@
 # Current State
 
-This handoff reflects repo state as of March 9, 2026.
+Updated: 2026-03-10
 
 ## Git Snapshot
 
 - Canonical repo: `/home/dj/dev/canva_leonardo_other_tools`
 - Branch: `main`
-- HEAD: `dbc6030`
 - Worktree: clean
-- Handoff suite path: `docs/ai-handoff/`
-- Validation targets confirmed in `Makefile`: `health`, `full-check`
+- Tests: 68 Python (all passing), dashboard tests passing
 
-## Supported Runtime Surface
-- `dj_msqrvve_brand_system/` is the maintained Python automation engine.
-- `dashboard/` is the maintained local control plane.
-- `docs/ARCHITECTURE.md`, `docs/OPERATIONS.md`, and `dj_msqrvve_brand_system/DOCS.md` are the maintained core docs.
+## CLI Commands
 
-## Historical Material
-- `docs/archive/` contains previous plans, research, and old handoffs.
-- `archive/` contains scaffold or prototype code that is not part of the supported runtime.
-- Do not revive archived surfaces unless the task explicitly says to do that.
+All via `cd dj_msqrvve_brand_system && PYTHONPATH=src venv/bin/python -m main`:
 
-## Current Runtime Guarantees
-- Stable CLI command names: `generate-api` and `generate-browser`.
-- Stable dashboard job states: `queued`, `running`, `success`, `failed`, `canceled`.
-- Dashboard execution is queue-backed through `/api/jobs` and related job-control routes only.
-- Dashboard API routes are localhost-only and the dev/start scripts bind to `127.0.0.1:6767`.
-- Dashboard queue persistence is local-first and single-process, not distributed.
-- Running jobs interrupted by dashboard restart are surfaced as failed and retryable.
+| Command | Purpose |
+|---------|---------|
+| `generate-browser <key> --headless` | Single browser generation via Firefox |
+| `generate-batch --category social --headless --sync` | Batch by category |
+| `generate-batch --all --headless` | Generate all 13 asset types |
+| `generate-batch <key> --variants 3 --headless` | Multiple variants |
+| `generate-api <key> --sync --autofill --export png` | Full API pipeline |
+| `canva-auth` | Check/refresh Canva token |
+| `gallery --port 6868` | Launch asset gallery |
+| `suggest` | Show what to generate next |
 
-## Hardening Work Already Completed
-- Canva OAuth bootstrap validates generated `state`.
-- Canva refresh tokens are persisted when returned and are consumed by runtime API clients.
-- Canva requests retry once on `401` or `403` through the refresh flow when refresh credentials are available.
-- Public `config/prompts.yaml` keeps placeholder Canva template mappings.
-- Real Canva template IDs are expected in gitignored `config/prompts.local.yaml`.
-- Leonardo browser automation fails fast when optional deps, Firefox, or a bootstrapped profile are missing.
-- Leonardo browser generation now uses adaptive result detection instead of a fixed wait.
-- Browser failures write local artifacts to `dj_msqrvve_brand_system/outputs/browser-artifacts/`.
-- The repo now has a supported manual live-provider smoke helper at `dj_msqrvve_brand_system/src/test_health.py`.
+## Architecture
 
-## What A New Agent Should Assume
-- The dirty worktree should be treated as intentional if you encounter one later.
-- Public docs must stay honest about tenant-specific configuration requirements.
-- The fastest way to understand current behavior is to read `src/main.py`, `src/auth_server.py`, `src/lib/leonardo_browser.py`, `dashboard/src/lib/job-runtime.js`, and `dashboard/src/lib/generation-command.js`.
-- Repo-level hardening gaps from the March 2026 cleanup pass are closed. The next meaningful work is usually live smoke execution against real local credentials, feature work, or bug fixes.
-- Leonardo generation uses `generate-browser` (Selenium) only. `LEONARDO_API_KEY` is not provisioned, so `generate-api` and the `test_health.py` Leonardo auth check are both blocked by design.
-- MSQRVVE Madness event delivery is cross-repo:
-  - Canva runtime and dashboard live here
-  - event ops live in `/home/dj/dev/brand/stream/events/msqrvve_madness_march_subathon_2026`
+### Browser hierarchy
+```
+BrowserBase (src/lib/browser/driver.py)
+├── LeonardoBrowser (src/lib/leonardo_browser.py)  — image generation
+└── CanvaBrowser (src/apis/canva/browser.py)       — design editor automation
+```
+
+### API clients
+- `LeonardoClient` (src/apis/leonardo_api.py) — API key auth, generation + polling
+- `CanvaClient` (src/apis/canva_api.py) — facade over Assets, Autofill, Exports, Designs sub-clients
+- `CanvaTokenManager` (src/apis/canva/auth.py) — OAuth token refresh + .env persistence
+
+### Pipeline
+- Ledger: `outputs/ledger.jsonl` — JSONL append-only, stage-level idempotency
+- Outputs: `outputs/raw/<run_id>/`, `outputs/exports/<run_id>/`
+- Gallery ratings: `outputs/ratings.json`
+- Browser artifacts: `outputs/browser-artifacts/`
+
+### Prompt categories
+| Category | Canva Folder | Example prompts |
+|----------|-------------|-----------------|
+| social | DJ Brand/Social Banners | social_banner_bg, profile_avatar |
+| stream_alerts | DJ Brand/Stream Alerts | raid_alert_art, follower_icon |
+| madness | DJ Brand/MSQRVVE Madness | madness_launch_key_art + 5 more |
+| game_2d | DJ Brand/Game Assets | helix2000_tileset_grass |
+| game_3d | DJ Brand/Game Assets | helix_main_texture_metal, bevy_skybox |
+
+## Environment
+
+- Python: 3.13.12 via `dj_msqrvve_brand_system/venv/`
+- Node: v25.7.0 via `~/.nvm/versions/node/v25.7.0/bin/`
+- Firefox: `/usr/bin/firefox` (snap)
+- Firefox profile: `~/snap/firefox/common/.mozilla/firefox/ebfog0e6.default`
+
+## Known Limitations
+
+- Leonardo API key not provisioned — `generate-api` blocked by design
+- Browser selectors hardcoded; Leonardo UI changes break automation
+- Ledger is O(n) scan per stage lookup (no indexing)
+- No retry logic on Leonardo API client for transient failures
+- Gallery has no auth or pagination
+- Single-process local queue in dashboard (not distributed)
